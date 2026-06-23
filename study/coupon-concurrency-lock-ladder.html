@@ -1,0 +1,1005 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>장부는 100, 실제는 999 — 동시성 락 사다리 v1→v5</title>
+<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#F7F3EA; --card:#FDFBF4; --panel:#F1ECDD; --inset:#EDE7D5;
+  --ink:#24271F; --soft:#5A5648; --mute:#8E8770;
+  --rule:#D8D0B8; --rule-soft:#E6DFCB;
+  --red:#B23A2B; --red-soft:#F4DFD8; --red-bd:#D9A091;
+  --green:#2F6B52; --green-soft:#DFE9DD; --green-bd:#9DBCA6;
+  --gold:#96701D; --gold-soft:#F2E7C8; --gold-bd:#D7BD7E;
+  --blue:#2D5577; --blue-soft:#DEE7EE; --blue-bd:#9FB8CC;
+  --code-bg:#2B2A24; --code-tx:#E8E3D2; --code-cm:#9A937C; --code-kw:#E0B05F; --code-str:#A8C29A;
+  --kr:'Pretendard Variable',-apple-system,sans-serif;
+  --display:'Fraunces',serif;
+  --mono:'JetBrains Mono',ui-monospace,monospace;
+}
+@media(prefers-color-scheme:dark){
+  :root{
+    --paper:#1B1A16; --card:#23211B; --panel:#26241D; --inset:#2C2A21;
+    --ink:#E9E4D4; --soft:#B5AE99; --mute:#7C7662;
+    --rule:#3D3A2E; --rule-soft:#343228;
+    --red:#E07B68; --red-soft:#3A211C; --red-bd:#6E342A;
+    --green:#7FB89B; --green-soft:#1F2E26; --green-bd:#3A5C49;
+    --gold:#D9B468; --gold-soft:#332B18; --gold-bd:#6E5A2B;
+    --blue:#8FB4D4; --blue-soft:#1D2932; --blue-bd:#3A5570;
+    --code-bg:#15140F; --code-tx:#DDD7C4; --code-cm:#807A66; --code-kw:#D9B468; --code-str:#A4BD96;
+  }
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{font-family:var(--kr);background:var(--paper);color:var(--ink);line-height:1.75;font-size:16.5px;
+  background-image:radial-gradient(ellipse at 12% 18%, rgba(150,112,29,.04) 0%, transparent 50%),
+                   radial-gradient(ellipse at 88% 85%, rgba(45,85,119,.035) 0%, transparent 50%)}
+.container{max-width:860px;margin:0 auto;padding:0 28px 110px}
+em{font-style:normal;font-weight:650}
+strong{font-weight:700}
+code{font-family:var(--mono);font-size:.86em;background:var(--inset);padding:1px 6px;border-radius:4px;border:1px solid var(--rule-soft)}
+
+/* ---------- cover ---------- */
+header.cover{text-align:center;padding:78px 28px 52px;border-bottom:1px solid var(--rule);background:var(--card)}
+.cover .eyebrow{font-family:var(--display);font-style:italic;font-size:13px;letter-spacing:.22em;text-transform:uppercase;color:var(--gold);margin-bottom:26px}
+.ledger-line{display:inline-flex;align-items:baseline;gap:22px;font-family:var(--display);margin-bottom:10px;flex-wrap:wrap;justify-content:center}
+.ledger-line .entry{display:flex;flex-direction:column;align-items:center;gap:2px}
+.ledger-line .lbl{font-family:var(--kr);font-size:12.5px;letter-spacing:.12em;color:var(--mute);font-weight:600}
+.ledger-line .num{font-size:clamp(52px,9vw,84px);font-weight:340;line-height:1;letter-spacing:-.02em}
+.ledger-line .num.ok{color:var(--ink)}
+.ledger-line .vs{font-style:italic;font-size:20px;color:var(--mute);align-self:center}
+.stamp{position:relative;color:var(--red)}
+.stamp .num{color:var(--red);font-weight:420}
+.stamp::after{content:'초과 +899';position:absolute;top:-14px;right:-30px;transform:rotate(7deg);
+  font-family:var(--kr);font-size:11px;font-weight:800;letter-spacing:.1em;color:var(--red);
+  border:2px solid var(--red);border-radius:4px;padding:2px 7px;opacity:.85;background:var(--card)}
+.cover h1{font-family:var(--kr);font-weight:760;font-size:clamp(26px,4.6vw,38px);line-height:1.28;letter-spacing:-.022em;max-width:680px;margin:26px auto 14px}
+.cover h1 .it{font-family:var(--display);font-style:italic;font-weight:400;color:var(--gold)}
+.cover .subtitle{font-size:16px;color:var(--soft);max-width:600px;margin:0 auto;line-height:1.8}
+.cover .meta{font-family:var(--display);font-size:11.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--mute);margin-top:30px}
+
+/* ---------- nav ---------- */
+nav.toc{position:sticky;top:0;z-index:60;background:color-mix(in srgb, var(--paper) 88%, transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--rule)}
+.toc-row{max-width:860px;margin:0 auto;display:flex;overflow-x:auto;padding:0 18px;scrollbar-width:none}
+.toc-row::-webkit-scrollbar{display:none}
+.toc a{flex-shrink:0;padding:13px 13px;font-size:12.5px;font-weight:600;letter-spacing:.03em;color:var(--mute);text-decoration:none;border-bottom:2px solid transparent;transition:.15s}
+.toc a:hover{color:var(--ink)}
+.toc a.active{color:var(--gold);border-bottom-color:var(--gold)}
+
+/* ---------- sections ---------- */
+section{padding-top:64px}
+.kicker{font-family:var(--display);font-style:italic;font-size:13px;letter-spacing:.2em;text-transform:uppercase;color:var(--gold);margin-bottom:10px}
+h2{font-size:clamp(23px,3.6vw,30px);font-weight:760;letter-spacing:-.022em;line-height:1.3;margin-bottom:18px}
+h2 .it{font-family:var(--display);font-style:italic;font-weight:400;color:var(--gold)}
+h3{font-size:18px;font-weight:740;margin:34px 0 12px;letter-spacing:-.015em}
+p{margin-bottom:16px;color:var(--ink)}
+p.dim{color:var(--soft)}
+.lede{font-size:18px;line-height:1.85;color:var(--ink)}
+
+/* ---------- prerequisites cards ---------- */
+.prereq-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:26px 0 8px}
+@media(max-width:680px){.prereq-grid{grid-template-columns:1fr}}
+.prereq{background:var(--card);border:1px solid var(--rule);border-radius:12px;padding:18px 20px}
+.prereq .pnum{font-family:var(--display);font-style:italic;font-size:13px;color:var(--gold);margin-bottom:6px;display:block}
+.prereq h4{font-size:15.5px;font-weight:740;margin-bottom:7px;letter-spacing:-.01em}
+.prereq p{font-size:14px;color:var(--soft);line-height:1.7;margin-bottom:8px}
+.prereq .where{font-size:12px;color:var(--mute);border-top:1px dashed var(--rule-soft);padding-top:8px;margin-top:2px}
+.prereq .where b{color:var(--gold);font-weight:700}
+
+/* ---------- metaphor callout ---------- */
+.metaphor{background:var(--gold-soft);border:1px solid var(--gold-bd);border-radius:12px;padding:16px 20px;margin:20px 0;font-size:15px;line-height:1.78}
+.metaphor .mk{font-weight:800;color:var(--gold);margin-right:6px}
+
+/* ---------- trap / note callouts ---------- */
+.trap{background:var(--red-soft);border:1px solid var(--red-bd);border-radius:12px;padding:16px 20px;margin:20px 0;font-size:15px;line-height:1.78}
+.trap .mk{font-weight:800;color:var(--red);margin-right:6px}
+.note{background:var(--blue-soft);border:1px solid var(--blue-bd);border-radius:12px;padding:16px 20px;margin:20px 0;font-size:15px;line-height:1.78}
+.note .mk{font-weight:800;color:var(--blue);margin-right:6px}
+
+/* ---------- ledger incident table ---------- */
+.ledger-card{background:var(--card);border:1px solid var(--rule);border-radius:14px;padding:24px 26px;margin:26px 0}
+.ledger-card .lc-title{font-family:var(--display);font-style:italic;font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute);margin-bottom:14px}
+.ledger-rows{display:flex;flex-direction:column;gap:0}
+.lrow{display:flex;justify-content:space-between;align-items:baseline;padding:10px 4px;border-bottom:1px dashed var(--rule-soft);gap:14px}
+.lrow:last-child{border-bottom:none}
+.lrow .k{font-size:14.5px;color:var(--soft)}
+.lrow .v{font-family:var(--mono);font-size:16px;font-weight:600}
+.lrow .v.bad{color:var(--red)} .lrow .v.good{color:var(--green)}
+
+/* ---------- race simulator ---------- */
+.sim{background:var(--card);border:1px solid var(--rule);border-radius:14px;padding:22px 24px;margin:28px 0}
+.sim-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.sim-head .t{font-weight:760;font-size:16px}
+.sim-btns{display:flex;gap:8px}
+.sim button{font-family:var(--kr);font-size:13.5px;font-weight:700;padding:8px 16px;border-radius:8px;border:1px solid var(--rule);background:var(--panel);color:var(--ink);cursor:pointer;transition:.15s}
+.sim button:hover{border-color:var(--gold);color:var(--gold)}
+.sim button.primary{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.sim button.primary:hover{opacity:.85;color:var(--paper)}
+.sim button:disabled{opacity:.4;cursor:default}
+.sim-stage{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px}
+@media(max-width:560px){.sim-stage{grid-template-columns:1fr}}
+.thread{background:var(--panel);border:1px solid var(--rule-soft);border-radius:10px;padding:12px 14px;min-height:118px;transition:border-color .2s}
+.thread.active{border-color:var(--gold)}
+.thread .th-name{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--mute);margin-bottom:8px}
+.thread .th-log{font-family:var(--mono);font-size:12.5px;line-height:1.9;color:var(--soft);white-space:pre-line}
+.thread .th-log .hl{color:var(--gold);font-weight:600}
+.sim-ledger{display:flex;gap:26px;flex-wrap:wrap;border-top:1px solid var(--rule-soft);padding-top:14px}
+.sim-ledger .cell{display:flex;flex-direction:column;gap:2px}
+.sim-ledger .cl{font-size:11.5px;letter-spacing:.08em;color:var(--mute);font-weight:700}
+.sim-ledger .cv{font-family:var(--mono);font-size:24px;font-weight:600}
+.sim-ledger .cv.bad{color:var(--red)}
+.sim-msg{font-size:13.5px;color:var(--soft);margin-top:12px;min-height:22px}
+.sim-msg b{color:var(--red)}
+
+/* ---------- axes ---------- */
+.axes{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin:26px 0}
+@media(max-width:680px){.axes{grid-template-columns:1fr}}
+.axis{background:var(--card);border:1px solid var(--rule);border-radius:12px;padding:18px 20px}
+.axis .ax-n{font-family:var(--display);font-style:italic;font-size:22px;color:var(--gold);line-height:1;margin-bottom:8px}
+.axis h4{font-size:15px;font-weight:760;margin-bottom:7px}
+.axis p{font-size:13.5px;color:var(--soft);line-height:1.7;margin:0}
+
+/* ---------- ladder version blocks ---------- */
+.ver{background:var(--card);border:1px solid var(--rule);border-radius:16px;padding:30px 32px;margin:34px 0;position:relative}
+@media(max-width:560px){.ver{padding:24px 20px}}
+.ver-tag{display:inline-flex;align-items:center;gap:10px;margin-bottom:12px}
+.ver-tag .vn{font-family:var(--display);font-weight:560;font-size:15px;letter-spacing:.04em;background:var(--ink);color:var(--paper);border-radius:6px;padding:3px 11px}
+.ver-tag .badge{font-size:11.5px;font-weight:800;letter-spacing:.06em;border-radius:5px;padding:3px 9px;border:1px solid}
+.badge.fail{color:var(--red);background:var(--red-soft);border-color:var(--red-bd)}
+.badge.pass{color:var(--green);background:var(--green-soft);border-color:var(--green-bd)}
+.badge.scope{color:var(--blue);background:var(--blue-soft);border-color:var(--blue-bd)}
+.ver h3{margin:2px 0 4px;font-size:21px}
+.ver .ver-sub{font-size:14px;color:var(--mute);margin-bottom:16px}
+.ver .blocked{font-size:14.5px;color:var(--soft);border-left:3px solid var(--rule);padding:2px 0 2px 14px;margin:18px 0}
+.ver .blocked b{color:var(--ink)}
+
+/* choice table */
+table.choices{width:100%;border-collapse:collapse;font-size:13.5px;margin:16px 0 6px}
+table.choices th{font-size:12px;letter-spacing:.05em;color:var(--mute);text-align:left;font-weight:700;padding:8px 10px;border-bottom:1px solid var(--rule)}
+table.choices td{padding:10px;border-bottom:1px dashed var(--rule-soft);vertical-align:top;line-height:1.65;color:var(--soft)}
+table.choices td:first-child{font-weight:700;color:var(--ink);white-space:nowrap}
+table.choices tr.picked td{background:var(--gold-soft)}
+table.choices tr.picked td:first-child::after{content:' ←채택';color:var(--gold);font-size:11px;font-weight:800}
+
+/* code */
+pre.code{background:var(--code-bg);color:var(--code-tx);font-family:var(--mono);font-size:13px;line-height:1.75;border-radius:12px;padding:18px 20px;overflow-x:auto;margin:18px 0;border:1px solid var(--rule)}
+pre.code .cm{color:var(--code-cm)} pre.code .kw{color:var(--code-kw)} pre.code .st{color:var(--code-str)}
+
+/* stats strip */
+.stats{display:flex;flex-wrap:wrap;gap:10px;margin:18px 0 4px}
+.stat{background:var(--panel);border:1px solid var(--rule-soft);border-radius:10px;padding:10px 16px;min-width:110px}
+.stat .sl{font-size:11px;letter-spacing:.07em;color:var(--mute);font-weight:700;margin-bottom:2px}
+.stat .sv{font-family:var(--mono);font-size:17px;font-weight:600}
+.stat .sv.bad{color:var(--red)} .stat .sv.good{color:var(--green)}
+.stat .sn{font-size:11px;color:var(--mute);margin-top:1px}
+
+/* lock location diagram */
+.loc-diagram{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin:24px 0}
+@media(max-width:680px){.loc-diagram{grid-template-columns:1fr}}
+.loc{background:var(--card);border:1px solid var(--rule);border-radius:12px;padding:16px 18px;text-align:center}
+.loc .li{font-size:26px;margin-bottom:6px}
+.loc h4{font-size:14px;font-weight:760;margin-bottom:4px}
+.loc p{font-size:12.5px;color:var(--soft);line-height:1.65;margin:0}
+.loc .scope-pill{display:inline-block;font-size:11px;font-weight:800;border-radius:4px;padding:2px 8px;margin-top:8px}
+.loc .scope-pill.s1{background:var(--red-soft);color:var(--red)}
+.loc .scope-pill.s2{background:var(--green-soft);color:var(--green)}
+
+/* stall timeline */
+.stall{background:var(--card);border:1px solid var(--rule);border-radius:14px;padding:24px 26px;margin:26px 0}
+.stall-track{position:relative;margin:18px 0 6px;padding-left:64px}
+.stall-row{display:flex;align-items:center;gap:0;margin-bottom:14px;position:relative;min-height:34px}
+.stall-row .who{position:absolute;left:-64px;width:54px;font-family:var(--mono);font-size:12px;font-weight:600;color:var(--mute);text-align:right}
+.seg{height:30px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;letter-spacing:.02em;padding:0 8px;white-space:nowrap}
+.seg.hold{background:var(--green-soft);color:var(--green);border:1px solid var(--green-bd)}
+.seg.stall-seg{background:var(--gold-soft);color:var(--gold);border:1px dashed var(--gold-bd)}
+.seg.expired{background:transparent;color:var(--mute);border:1px dashed var(--rule)}
+.seg.steal{background:var(--red-soft);color:var(--red);border:1px solid var(--red-bd)}
+.stall-mark{position:absolute;top:-6px;bottom:-6px;width:2px;background:var(--red);opacity:.7}
+.stall-mark .ml{position:absolute;top:-20px;left:-30px;width:70px;text-align:center;font-size:10.5px;font-weight:800;color:var(--red)}
+.stall .legend{font-size:12.5px;color:var(--mute);margin-top:14px;line-height:1.7}
+
+/* comparison table */
+table.compare{width:100%;border-collapse:collapse;font-size:13px;margin:20px 0}
+table.compare th{font-size:12px;color:var(--mute);font-weight:700;padding:9px 8px;border-bottom:1px solid var(--rule);text-align:center}
+table.compare th:first-child{text-align:left}
+table.compare td{padding:9px 8px;border-bottom:1px dashed var(--rule-soft);text-align:center;color:var(--soft);line-height:1.5}
+table.compare td:first-child{text-align:left;font-weight:700;color:var(--ink);white-space:nowrap}
+table.compare td.bad{color:var(--red);font-weight:700}
+table.compare td.good{color:var(--green);font-weight:700}
+table.compare td.pick{background:var(--gold-soft);color:var(--ink);font-weight:700}
+.tbl-scroll{overflow-x:auto}
+
+/* glossary */
+dfn.term{font-style:normal;text-decoration:underline dotted var(--gold);text-underline-offset:3px;cursor:help;color:inherit}
+#term-pop{position:absolute;z-index:90;max-width:320px;background:var(--card);border:1px solid var(--gold-bd);border-radius:10px;padding:12px 15px;font-size:13px;line-height:1.7;color:var(--soft);box-shadow:0 8px 28px rgba(0,0,0,.14);display:none}
+#term-pop .tp-t{font-weight:800;color:var(--ink);font-size:13.5px;margin-bottom:4px}
+.glossary{margin-top:10px}
+.gl-item{padding:14px 4px;border-bottom:1px dashed var(--rule-soft)}
+.gl-item .gt{font-weight:760;font-size:15px;margin-bottom:3px}
+.gl-item .gt code{font-size:.9em}
+.gl-item .gd{font-size:14px;color:var(--soft);line-height:1.75}
+
+footer{margin-top:80px;padding-top:22px;border-top:1px solid var(--rule);font-size:12px;color:var(--mute);text-align:center;line-height:1.8}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+</style>
+</head>
+<body>
+
+<header class="cover">
+  <div class="eyebrow">High-Traffic Lab · Phase 3-3 · Concurrency</div>
+  <div class="ledger-line">
+    <span class="entry"><span class="lbl">장부 (counter)</span><span class="num ok">100</span></span>
+    <span class="vs">그러나 실제는</span>
+    <span class="entry stamp"><span class="lbl">실제 발급 (행 수)</span><span class="num">999</span></span>
+  </div>
+  <h1>한정 수량 쿠폰은 어떻게 무너지고,<br>락은 그것을 <span class="it">어디서</span> 막는가</h1>
+  <p class="subtitle">100장 한정 쿠폰이 999장 발급됐다. 락 없음 → JVM → DB → Redis 분산 락까지
+  다섯 단계를 전부 구현·측정하고, 마지막에 사다리를 한 칸 <em>내려와</em> DB 행 락을 선택한 기록.</p>
+  <div class="meta">읽는 시간 ≈ 25분 · 대상: 동시성 제어가 처음인 백엔드 개발자</div>
+</header>
+
+<nav class="toc" id="toc">
+  <div class="toc-row">
+    <a href="#prereq">0. 선수지식</a>
+    <a href="#incident">1. 사건</a>
+    <a href="#axes">2. 세 개의 축</a>
+    <a href="#ladder">3. 사다리 v1–v5</a>
+    <a href="#stall">4. 락이 만료되면</a>
+    <a href="#numbers">5. 숫자 읽는 법</a>
+    <a href="#verdict">6. 결정</a>
+    <a href="#glossary">부록 · 용어</a>
+  </div>
+</nav>
+
+<div class="container">
+<!-- ======================== 0. 선수지식 ======================== -->
+<section id="prereq">
+  <div class="kicker">Part 0 · Prerequisites</div>
+  <h2>본문에 들어가기 전, <span class="it">일곱 가지</span>만 챙기자</h2>
+  <p class="lede">이 글은 "동시성 제어를 한 번도 해본 적 없는" 백엔드 개발자를 기준으로 쓴다.
+  아래 일곱 개념은 본문 어딘가에서 반드시 발목을 잡는 것들이다. 이미 아는 카드는 건너뛰어도 된다 —
+  각 카드 하단에 <b>어느 장면에서 필요한지</b> 적어 두었으니, 막히면 돌아와서 읽으면 된다.</p>
+
+  <div class="prereq-grid">
+    <div class="prereq">
+      <span class="pnum">P1</span>
+      <h4>check-then-act, 그리고 레이스 컨디션 <span style="font-size:11px;font-weight:800;color:var(--gold)">— 원자성의 문제</span></h4>
+      <p>"확인하고(check) → 행동한다(act)"가 두 단계로 쪼개져 있으면, 확인과 행동 <em>사이</em>에 다른 스레드가 끼어들 수 있다.
+      <code>if (issued &lt; total)</code> 확인 후 <code>issued++</code> 하는 코드가 정확히 이 모양이다.
+      누가 먼저 끼어드느냐에 따라 결과가 달라지는 상황을 레이스 컨디션이라 부른다.</p>
+      <div class="where"><b>어디서:</b> §1 사건 전체. 999가 나온 근본 원인.</div>
+    </div>
+    <div class="prereq">
+      <span class="pnum">P2</span>
+      <h4>트랜잭션과 커밋 — "언제 남에게 보이나" <span style="font-size:11px;font-weight:800;color:var(--gold)">— 가시성의 문제</span></h4>
+      <p>트랜잭션 안에서 바꾼 값은 <em>커밋되기 전까지 다른 트랜잭션에게 보이지 않는다</em>.
+      그래서 "내가 값을 바꿨다"와 "남이 그 값을 본다" 사이에 시차가 있다.
+      락이 원자성을 줘도, <em>락 경계가 커밋(가시성 경계)까지 덮지 못하면</em> 남은 여전히 옛날 값(stale)을 읽는다.</p>
+      <div class="where"><b>어디서:</b> §3 v2의 프록시 함정 — 락은 풀렸는데 커밋이 안 끝난 순간.</div>
+    </div>
+    <div class="prereq">
+      <span class="pnum">P3</span>
+      <h4><code>@Transactional</code>은 프록시다</h4>
+      <p>Spring은 <code>@Transactional</code> 메서드를 직접 실행하지 않는다. 원본 객체를 감싼
+      <em>프록시</em>가 "트랜잭션 시작 → 원본 메서드 → 커밋"을 대신 수행한다.
+      그래서 커밋은 메서드 본문이 아니라 <em>프록시 계층에서, 메서드가 끝난 뒤</em> 일어난다 —
+      이 위치 감각이 없으면 v2를 이해할 수 없다.</p>
+      <div class="where"><b>어디서:</b> §3 v2. <code>synchronized</code>를 어디에 둘지가 여기서 갈린다.</div>
+    </div>
+    <div class="prereq">
+      <span class="pnum">P4</span>
+      <h4>커넥션 풀 — DB로 가는 차선은 10개뿐</h4>
+      <p>앱은 DB 커넥션을 매번 새로 만들지 않고 풀(pool)에서 빌려 쓴다. 이 실험에선
+      HikariCP 풀 크기를 <em>10으로 고정</em>했다. 동시 요청이 500이어도 DB에 닿는 차선은 10개 —
+      나머지는 풀 앞에서 줄을 선다. 커넥션을 <em>쥔 채로</em> 무언가를 기다리면 차선이 그만큼 잠긴다.</p>
+      <div class="where"><b>어디서:</b> §3 v3의 풀 포화(active 10/10, pending 189).</div>
+    </div>
+    <div class="prereq">
+      <span class="pnum">P5</span>
+      <h4>프로세스 경계 — 스케일아웃이 깨뜨리는 것</h4>
+      <p>JVM 안의 객체(모니터, static 변수…)는 <em>그 프로세스 안에서만</em> 존재한다.
+      서버를 2대로 늘리면(스케일아웃) 같은 코드가 두 프로세스에서 돌고, 각자 <em>자기만의</em> 락 객체를 갖는다.
+      서로의 락을 모르는 두 프로세스는 동시에 임계 구간에 들어간다.</p>
+      <div class="where"><b>어디서:</b> §3 v2의 한계 — v3로 넘어가는 이유.</div>
+    </div>
+    <div class="prereq">
+      <span class="pnum">P6</span>
+      <h4>Redis와 TTL — 만료되는 자물쇠</h4>
+      <p>Redis는 모든 서버가 공유하는 외부 키-값 저장소다. 키에 TTL(유효 시간)을 걸면 시간이 지나
+      <em>자동 삭제</em>된다. 분산 락은 "키가 비어 있을 때만 내 것으로 세팅"으로 락을 흉내 내는데 —
+      이때 락을 현재 쥐고 있는 주체(이 글에선 락을 획득한 그 요청/스레드)를 <em>홀더(holder)</em>라 부른다.
+      홀더가 죽어도 락이 회수되도록 TTL을 건다. 문제는 — <em>홀더가 안 죽었는데 TTL이 먼저 끝나면?</em></p>
+      <div class="where"><b>어디서:</b> §3 v4·v5, 그리고 §4 스톨 데모 전체.</div>
+    </div>
+    <div class="prereq">
+      <span class="pnum">P7</span>
+      <h4>측정 용어 — VU, p95, 409와 503</h4>
+      <p><em>VU</em>는 부하 도구(k6)의 가상 사용자 — "500 VU"는 500명이 쉬지 않고 요청한다는 뜻.
+      <em>p95</em>는 응답시간 백분위 — 95%의 요청이 이 시간 안에 끝났다는 뜻.
+      HTTP <em>409</em>는 "한도 소진/중복" 같은 정상 거절(상태가 그래서 — 재시도 무의미),
+      <em>503</em>은 "지금은 처리 못 함"(풀 고갈 ⓐ, 행락 대기 초과 ⓑ, 락 미획득 ⓒ — 타이밍이 그래서, 재시도 가능).</p>
+      <div class="where"><b>어디서:</b> 모든 실측 수치 박스.</div>
+    </div>
+  </div>
+
+  <h3 style="margin-top:36px">P7 보충 — 거절을 가르는 한 가지 질문</h3>
+  <p class="dim" style="font-size:14.5px">409와 503은 같은 "거절"처럼 보이지만 책임의 소재가 다르다.
+  기준은 하나 — <strong style="color:var(--ink)">다시 보내면 결과가 달라질 수 있는가?</strong></p>
+  <div class="ledger-card" style="padding:18px 18px 10px">
+  <svg viewBox="0 0 920 600" style="width:100%;height:auto;display:block" font-family="'Pretendard Variable',Pretendard,sans-serif" role="img" aria-label="409와 503을 가르는 의사결정 트리">
+    <defs>
+      <marker id="arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="var(--mute)"/>
+      </marker>
+    </defs>
+    <text x="460" y="34" text-anchor="middle" font-size="20" font-weight="800" fill="var(--ink)">409 vs 503 — 거절의 두 종류</text>
+    <text x="460" y="58" text-anchor="middle" font-size="13" fill="var(--mute)">한정 수량 쿠폰 발급 사례</text>
+    <rect x="345" y="88" width="230" height="44" rx="10" fill="var(--panel)" stroke="var(--rule)" stroke-width="1.5"/>
+    <text x="460" y="115" text-anchor="middle" font-size="14.5" font-weight="700" fill="var(--ink)">요청이 거절됐다</text>
+    <line x1="460" y1="132" x2="460" y2="162" stroke="var(--mute)" stroke-width="1.5" marker-end="url(#arr2)"/>
+    <polygon points="460,164 650,218 460,272 270,218" fill="var(--panel)" stroke="var(--gold)" stroke-width="2"/>
+    <text x="460" y="211" text-anchor="middle" font-size="15" font-weight="800" fill="var(--ink)">다시 보내면</text>
+    <text x="460" y="233" text-anchor="middle" font-size="15" font-weight="800" fill="var(--ink)">결과가 달라질 수 있나?</text>
+    <path d="M 270 218 H 200 V 316" fill="none" stroke="var(--mute)" stroke-width="1.5" marker-end="url(#arr2)"/>
+    <rect x="118" y="232" width="154" height="24" rx="6" fill="var(--blue-soft)"/>
+    <text x="195" y="249" text-anchor="middle" font-size="12.5" font-weight="800" fill="var(--blue)">아니오 — 상태가 그래서</text>
+    <path d="M 650 218 H 720 V 316" fill="none" stroke="var(--mute)" stroke-width="1.5" marker-end="url(#arr2)"/>
+    <rect x="648" y="232" width="154" height="24" rx="6" fill="var(--gold-soft)"/>
+    <text x="725" y="249" text-anchor="middle" font-size="12.5" font-weight="800" fill="var(--gold)">예 — 타이밍이 그래서</text>
+    <rect x="60" y="320" width="280" height="158" rx="12" fill="var(--card)" stroke="var(--blue)" stroke-width="2"/>
+    <path d="M 60 332 a12 12 0 0 1 12 -12 h 256 a12 12 0 0 1 12 12 v 30 h -280 z" fill="var(--blue-soft)"/>
+    <text x="200" y="347" text-anchor="middle" font-size="16" font-weight="800" fill="var(--blue)">409 Conflict — 영구 거절</text>
+    <text x="80" y="388" font-size="13" fill="var(--ink)">· SOLD_OUT — 한도 소진</text>
+    <text x="80" y="410" font-size="13" fill="var(--ink)">· ALREADY_ISSUED — 같은 사용자 중복</text>
+    <text x="80" y="438" font-size="12.5" fill="var(--soft)">비즈니스 "상태"의 결론. 정상 경로다.</text>
+    <text x="80" y="462" font-size="13" font-weight="800" fill="var(--blue)">→ 재시도 중단 ("끝났어요")</text>
+    <rect x="580" y="320" width="280" height="158" rx="12" fill="var(--card)" stroke="var(--gold)" stroke-width="2"/>
+    <path d="M 580 332 a12 12 0 0 1 12 -12 h 256 a12 12 0 0 1 12 12 v 30 h -280 z" fill="var(--gold-soft)"/>
+    <text x="720" y="347" text-anchor="middle" font-size="16" font-weight="800" fill="var(--gold)">503 Unavailable — 일시 거절</text>
+    <text x="600" y="386" font-size="13" fill="var(--ink)">ⓐ 커넥션 풀 고갈 (connTO 30s 초과)</text>
+    <text x="600" y="407" font-size="13" fill="var(--ink)">ⓑ DB 행 락 대기 초과 (50s 초과)</text>
+    <text x="600" y="428" font-size="13" fill="var(--ink)">ⓒ 분산 락 미획득 (fail-fast)</text>
+    <text x="600" y="462" font-size="13" font-weight="800" fill="var(--gold)">→ 잠시 후 재시도 ("지금만 안 돼요")</text>
+    <line x1="60" y1="504" x2="860" y2="504" stroke="var(--rule)" stroke-width="1"/>
+    <text x="60" y="528" font-size="12" font-weight="800" fill="var(--mute)" letter-spacing="1">부하 테스트에서의 독해</text>
+    <text x="60" y="552" font-size="13" fill="var(--ink)">대기 락 (v2·v3) → <tspan font-weight="800" fill="var(--blue)">503 = 0</tspan> 이 정상 — 경합을 지연으로 흡수</text>
+    <text x="480" y="552" font-size="13" fill="var(--ink)">즉시거절 락 (v4·v5) → <tspan font-weight="800" fill="var(--gold)">503율 ~99%</tspan> 가 정상 — 경합을 거절로 배출</text>
+    <text x="60" y="576" font-size="12.5" fill="var(--soft)">같은 "거절률" 컬럼이라도 정책이 다르면 의미가 다르다 — 버전 간 직접 비교를 금지한 이유(§5).</text>
+  </svg>
+  </div>
+
+  <p class="dim" style="font-size:14px">밑줄 점선이 그어진 <dfn class="term" data-term="용어 미리보기" data-def="이렇게 점선 밑줄이 있는 단어는 마우스를 올리거나(모바일은 탭) 부록에서 정의를 확인할 수 있다.">용어</dfn>는
+  호버/탭으로 정의를 볼 수 있고, 전체 목록은 맨 아래 <a href="#glossary">부록</a>에 있다.</p>
+</section>
+
+<!-- ======================== 1. 사건 ======================== -->
+<section id="incident">
+  <div class="kicker">Part 1 · The Incident</div>
+  <h2>사건 — 장부는 100이라고 말했다</h2>
+  <p class="lede">발급 한도 <code>total=100</code>인 쿠폰에 500명의 가상 사용자가 10초간 동시에 달려들었다.
+  결과를 두 가지 방법으로 세어 보자.</p>
+
+  <div class="ledger-card">
+    <div class="lc-title">v1 · No Lock — 같은 결과를 두 지표로 세다</div>
+    <div class="ledger-rows">
+      <div class="lrow"><span class="k">발급 한도 (total_qty)</span><span class="v">100</span></div>
+      <div class="lrow"><span class="k">쿠폰 테이블의 카운터 (coupon.issued)</span><span class="v">100 &nbsp;<span style="font-size:12px;color:var(--mute)">"한도 지켜진 듯?"</span></span></div>
+      <div class="lrow"><span class="k">발급 이력 행 수 (SELECT COUNT(*) FROM coupon_issue)</span><span class="v bad">999</span></div>
+      <div class="lrow"><span class="k">초과 발급</span><span class="v bad">+899 (10배)</span></div>
+    </div>
+  </div>
+
+  <p>두 숫자가 갈라졌다. 카운터는 100을 가리키는데, 실제 발급 이력은 999행이다.
+  <strong>카운터가 거짓말을 한 게 아니라, 카운터를 갱신하는 과정 자체가 동시성 앞에서 무너진 것이다.</strong>
+  이 현상이 <dfn class="term" data-term="lost update (갱신 손실)" data-def="두 트랜잭션이 같은 값을 읽고 각자 갱신하면, 나중에 쓰는 쪽이 앞의 갱신을 덮어써서 한 번의 갱신이 통째로 사라지는 현상.">lost update(갱신 손실)</dfn>다.</p>
+
+  <div class="metaphor"><span class="mk">🎟️ 비유.</span>
+  점원 두 명이 동시에 장부를 본다. 둘 다 "지금까지 94장 나갔네"라고 <em>읽는다</em>.
+  각자 한 장씩 발급하고 "95장"이라고 <em>적는다</em>. 실제로는 96장이 나갔는데 장부엔 95 —
+  한 명의 기록이 통째로 증발했다. 점원이 500명이면, 장부는 100에서 멈추고 실제 발급은 999장이 된다.</div>
+
+  <h3>코드로 보면 — 트랜잭션은 있었다</h3>
+  <pre class="code"><span class="cm">// v1 — @Transactional은 걸려 있다. 초과는 트랜잭션 부재가 아니라 동시성 제어 부재에서 난다.</span>
+<span class="kw">@Transactional</span>
+public CouponIssueResponse issue(Long couponId, Long userId) {
+    Coupon coupon = couponRepository.findById(couponId).orElseThrow(...);
+    ...
+    coupon.issue();   <span class="cm">// 내부: if (issued < total) issued++  ← check-then-act, 비원자</span>
+    couponIssueRepository.save(new CouponIssue(couponId, userId));
+    ...
+}</pre>
+  <p><code>coupon.issue()</code> 안에서 일어나는 <em>읽고(read) → 확인하고(check) → 더하는(increment)</em> 세 단계가
+  하나의 원자적 동작이 아니다(선수지식 P1). 500개의 트랜잭션이 거의 같은 순간 같은 <code>issued</code> 값을 읽으면,
+  전부 "아직 한도 미만"이라는 확인을 통과해 버린다. 직접 눌러 보자.</p>
+
+  <div class="sim" id="race-sim">
+    <div class="sim-head">
+      <div class="t">레이스 시뮬레이터 — 세 스레드가 같은 장부를 읽으면</div>
+      <div class="sim-btns">
+        <button id="sim-step" class="primary">한 단계씩 진행</button>
+        <button id="sim-reset">초기화</button>
+      </div>
+    </div>
+    <div class="sim-stage">
+      <div class="thread" id="th-a"><div class="th-name">스레드 A</div><div class="th-log"></div></div>
+      <div class="thread" id="th-b"><div class="th-name">스레드 B</div><div class="th-log"></div></div>
+      <div class="thread" id="th-c"><div class="th-name">스레드 C</div><div class="th-log"></div></div>
+    </div>
+    <div class="sim-ledger">
+      <div class="cell"><span class="cl">한도 total</span><span class="cv">100</span></div>
+      <div class="cell"><span class="cl">장부 issued (counter)</span><span class="cv" id="sim-counter">97</span></div>
+      <div class="cell"><span class="cl">실제 발급 행 수 (actual)</span><span class="cv" id="sim-actual">97</span></div>
+    </div>
+    <div class="sim-msg" id="sim-msg">버튼을 눌러 READ → CHECK → WRITE 순서로 진행해 보자.</div>
+  </div>
+
+  <div class="trap"><span class="mk">⚠ 교훈 하나를 먼저 챙기자.</span>
+  정합성 판정을 <em>카운터로 하면 안 된다</em>. 카운터는 lost update로 천장에 캡된 것처럼 보일 수 있다.
+  이 실험 전체에서 정합성의 <dfn class="term" data-term="단일 진실 소스" data-def="여러 지표가 서로 다른 말을 할 때 무엇을 믿을지 미리 정해둔 기준. 이 실험에서는 coupon_issue 테이블의 실제 행 수.">단일 진실 소스</dfn>는
+  <code>SELECT COUNT(*) FROM coupon_issue</code> — 실제 발급 <strong>행 수(actual)</strong>다.</div>
+
+  <p>해결의 방향은 단순하다 — <strong>한 번에 한 명만 장부를 고치게</strong> 만들면 된다.
+  그 "한 번에 한 명"을 강제하는 장치가 <dfn class="term" data-term="락 (lock)" data-def="임계 구간에 동시에 하나의 실행 주체만 들어가도록 강제하는 동기화 장치.">락(lock)</dfn>이고,
+  보호해야 하는 구간 — 여기서는 read·check·increment·insert — 을 <dfn class="term" data-term="임계 구간 (critical section)" data-def="동시에 둘 이상이 실행하면 결과가 깨지는 코드 구간. 락은 이 구간을 한 번에 하나만 통과하게 만든다.">임계 구간</dfn>이라 부른다.
+  이제부터의 질문은 "락을 걸까 말까"가 아니라 — <em>락을 어디에 두고, 어떻게 운영할 것인가</em>다.</p>
+
+  <div class="metaphor"><span class="mk">🪶 락 = 발언권 막대.</span>
+  회의에서 막대를 쥔 사람만 말할 수 있듯, 락을 쥔 스레드만 장부를 고친다.
+  다섯 버전의 차이는 결국 세 가지다 — <em>그 막대를 어디에 두는가, 막대가 비기를 기다릴 것인가 포기할 것인가,
+  막대를 얼마나 오래 쥘 수 있는가.</em></div>
+</section>
+<!-- ======================== 2. 세 개의 축 ======================== -->
+<section id="axes">
+  <div class="kicker">Part 2 · How to Read</div>
+  <h2>버전을 가르는 <span class="it">세 개의 축</span></h2>
+  <p class="lede">지금부터 다섯 버전이 나온다. 미리 못 박아 둘 것이 하나 있다 —
+  <strong>이 다섯은 "낮은 게 틀리고 높은 게 맞는" 등급이 아니다.</strong>
+  각자 다른 조건에서 각자 정답인 다섯 개의 도구다. "누가 빠른가"로 줄을 세우면 틀린 결론에 빠진다
+  (왜 그런지는 §5에서 직접 증명한다). 대신 이 세 가지 질문으로 읽으면 각 버전의 정체가 드러난다.</p>
+
+  <div class="axes">
+    <div class="axis"><div class="ax-n">①</div><h4>정합 범위 — 락이 어디까지 통하나</h4>
+      <p>한 프로세스(JVM) 안에서만? 서버 여러 대 사이에서도? <em>락이 사는 위치</em>가 이 범위를 정한다.</p></div>
+    <div class="axis"><div class="ax-n">②</div><h4>경합 흡수 — 막혔을 때 어쩌나</h4>
+      <p>무시하고 들이받나(v1), 줄 서서 기다리나(v2·v3), 즉시 포기하고 거절하나(v4·v5).
+      직렬화 비용이 <em>지연</em>으로 나올지 <em>거절</em>로 나올지가 여기서 갈린다.</p></div>
+    <div class="axis"><div class="ax-n">③</div><h4>갱신 정책 — 쥔 채로 만료되면</h4>
+      <p>락에 유효 시간이 있는 버전(v4·v5)만의 축. 자동으로 연장해 주나(워치독),
+      고정 시간이 지나면 무조건 떨어지나(고정 TTL).</p></div>
+  </div>
+</section>
+
+<!-- ======================== 3. 사다리 ======================== -->
+<section id="ladder">
+  <div class="kicker">Part 3 · The Ladder</div>
+  <h2>한 문제, <span class="it">다섯 번의</span> 답</h2>
+  <p class="lede">각 칸은 같은 구조로 읽는다 — <em>앞 칸에서 막힌 것 → 그 자리의 선택지 → 채택과 구현 →
+  실측 → 새로 드러난 한계.</em> 한계가 다음 칸의 문이 된다.</p>
+
+  <!-- ===== v1 ===== -->
+  <div class="ver" id="v1">
+    <div class="ver-tag"><span class="vn">v1</span><span class="badge fail">FAIL · 초과 발급</span></div>
+    <h3>No Lock — 문제를 또렷이 재현한다</h3>
+    <div class="ver-sub">기준선. 여기서 PASS가 났다면 그게 버그다.</div>
+    <p>락을 전혀 걸지 않고 500 VU를 들이받았다. 목적은 두 가지 — 초과 발급이 정말 재현되는지,
+    그리고 측정 도구가 그 사고를 제대로 잡아내는지. 결과는 §1에서 본 그대로다:
+    <strong>actual=999, 초과 +899.</strong> 그리고 카운터는 100에 캡 — lost update의 물증.</p>
+    <div class="stats">
+      <div class="stat"><div class="sl">정합 (actual)</div><div class="sv bad">999 / 100</div><div class="sn">FAIL = 기준선의 정답</div></div>
+      <div class="stat"><div class="sl">성공 처리량</div><div class="sv">404.0/s</div><div class="sn">락 대기 0의 속도</div></div>
+      <div class="stat"><div class="sl">성공 p95</div><div class="sv">1838ms</div><div class="sn">풀 10개 대기 비용</div></div>
+    </div>
+    <p class="dim" style="font-size:14px">눈여겨볼 것: 무락인데도 p95가 1.8초다. 락이 없어도 커넥션 풀 10개를
+    500 VU가 나눠 쓰는 대기(선수지식 P4)는 그대로 있다 — 이후 모든 버전이 이 바닥 위에서 돈다.</p>
+    <div class="blocked"><b>막힌 것:</b> 한정 수량 자원에서 초과는 곧 결함이다. 임계 구간을 직렬화할 무언가가 필요하다. → v2</div>
+  </div>
+
+  <!-- ===== v2 ===== -->
+  <div class="ver" id="v2">
+    <div class="ver-tag"><span class="vn">v2</span><span class="badge pass">PASS</span><span class="badge scope">단일 JVM 한정</span></div>
+    <h3>synchronized — 건물 안에 막대를 하나 둔다</h3>
+    <div class="ver-sub">정합 범위: 단일 JVM · 경합 흡수: park(무한 대기)</div>
+
+    <p>직렬화 수단의 후보는 셋이었다.</p>
+    <table class="choices">
+      <tr><th>후보</th><th>왜 검토했나</th><th>왜 안 골랐나 / 골랐나</th></tr>
+      <tr><td>낙관적 락 (<code>@Version</code>)</td><td>락을 안 잡고 충돌 시 재시도 — 저경합에 가볍다</td>
+        <td>단일 쿠폰(<dfn class="term" data-term="핫키 (hot key)" data-def="동시 요청이 한 개의 키/행에 집중되는 상황. 충돌 기반 기법(낙관적 락)이 가장 약해지는 조건.">핫키</dfn>)에 500 VU가 몰리는 초고경합 — 충돌·재시도가 폭증하는 재시도 폭풍</td></tr>
+      <tr><td><code>ReentrantLock</code></td><td>타임아웃·공정성 등 세밀한 제어</td><td>필요한 건 단일 임계 구간 하나 — 추가 제어를 쓸 데가 없어 복잡도만 증가</td></tr>
+      <tr class="picked"><td><code>synchronized</code></td><td>가장 단순한 JVM <dfn class="term" data-term="모니터 (monitor)" data-def="자바 객체마다 붙어 있는 내장 락. synchronized 블록이 이 모니터를 획득/해제한다.">모니터</dfn>, 의도가 코드에 드러남</td><td>채택 — 단, 프록시 함정 하나를 반드시 피해야 한다</td></tr>
+    </table>
+
+    <div class="trap"><span class="mk">⚠ 프록시 함정 — 이 버전의 진짜 내용.</span>
+    <code>@Transactional</code> 메서드에 <code>synchronized</code>를 <em>같이 걸면</em> 망한다.
+    커밋은 프록시 계층에서, 메서드가 끝난 <em>뒤에</em> 일어난다(선수지식 P3).
+    즉 모니터는 메서드 끝에서 풀리는데 커밋은 그 다음 — <strong>락이 풀린 뒤 커밋되는 틈</strong>에
+    다음 스레드가 아직 커밋 안 된 stale <code>issued</code>를 읽는다(P2). 단일 JVM에서도 초과가 난다.</div>
+
+    <p>해법은 순서를 뒤집는 것이다 — <strong>락이 트랜잭션을 감싸야 한다(락 ⊃ tx)</strong>.
+    모니터를 트랜잭션 경계 <em>바깥</em>(파사드)에 두고, 실제 트랜잭션은 <em>별도 빈</em>을 프록시로 호출한다.
+    같은 빈 안에서 자기 메서드를 부르면 프록시를 안 거치므로 반드시 빈을 분리해야 한다.</p>
+
+    <pre class="code"><span class="cm">// 파사드 — 모니터가 트랜잭션 경계를 감싼다 (락 ⊃ tx)</span>
+public CouponIssueResponse issue(Long couponId, Long userId) {
+    <span class="kw">synchronized</span> (lock) {                       <span class="cm">// ① 모니터 획득 — tx 밖</span>
+        return inner.issueTx(couponId, userId); <span class="cm">// ② "별도 빈" 프록시 호출 → 시작·커밋이 모니터 안에서 완료</span>
+    }                                            <span class="cm">// ③ 커밋이 끝난 뒤에야 모니터 해제</span>
+}</pre>
+
+    <p>실측: <strong>actual=100, PASS.</strong> 그리고 카운터까지 100==actual — 직렬화가
+    read-modify-write를 원자화하자 카운터도 진실과 일치하게 됐다(v1과의 결정적 차이).
+    이 PASS 자체가 "파사드+별도 빈 분리가 런타임에 올바로 먹었다"는 증거다 —
+    분리가 실패했다면 단일 JVM에서도 초과가 났을 것이므로.</p>
+
+    <div class="stats">
+      <div class="stat"><div class="sl">정합 (actual)</div><div class="sv good">100 / 100</div><div class="sn">counter==actual</div></div>
+      <div class="stat"><div class="sl">성공 처리량</div><div class="sv">263.6/s</div><div class="sn">전직렬화의 대가</div></div>
+      <div class="stat"><div class="sl">성공 p95</div><div class="sv">2971ms</div><div class="sn">경합을 지연으로 흡수</div></div>
+      <div class="stat"><div class="sl">503 거절</div><div class="sv">0</div><div class="sn">park = 무한 대기, 거절 없음</div></div>
+    </div>
+
+    <div class="metaphor"><span class="mk">🏢 비유.</span> 발언권 막대가 <em>한 건물 안에만</em> 있다.
+    그 건물 직원들끼리는 완벽하게 한 명씩 처리한다. 그런데 지점을 하나 더 열면? 새 건물엔
+    <em>또 다른 막대</em>가 생긴다. 두 건물은 서로의 막대를 모른 채 동시에 발급한다.</div>
+
+    <div class="blocked"><b>막힌 것:</b> 모니터는 그 JVM 프로세스 안에서만 유효하다(P5).
+    인스턴스를 늘리는 순간 정합이 깨진다 — 이 붕괴 자체는 단일 JVM 측정으론 실증할 수 없어
+    <em>알려진 한계</em>로 기록해 둔다. 직렬화 좌표를 <em>모두가 공유하는 곳</em>으로 옮겨야 한다. → v3</div>
+  </div>
+
+  <!-- ===== v3 ===== -->
+  <div class="ver" id="v3">
+    <div class="ver-tag"><span class="vn">v3</span><span class="badge pass">PASS</span><span class="badge scope">다중 인스턴스 (공유 DB행)</span></div>
+    <h3>SELECT … FOR UPDATE — 중앙 장부가 직접 잠근다</h3>
+    <div class="ver-sub">정합 범위: 다중(공유 DB 행) · 경합 흡수: DB 대기열(지연)</div>
+
+    <p>"모두가 공유하는 좌표"의 후보도 셋이었다.</p>
+    <table class="choices">
+      <tr><th>후보</th><th>맞는 조건</th><th>이 워크로드에선</th></tr>
+      <tr><td>DB 유니크 제약</td><td>"같은 키의 중복"을 막을 때</td><td>이미 <code>unique(coupon_id, user_id)</code>로 같은 사용자 중복은 차단 중.
+        그러나 지금 막을 것은 <em>서로 다른</em> 사용자들의 초과 — 유니크가 닿지 않는다</td></tr>
+      <tr><td>낙관적 락 + 재시도</td><td>공유 + 저경합</td><td>v2 자리에서 본 그대로 — 단일 핫키 고경합엔 재시도 폭풍</td></tr>
+      <tr class="picked"><td>비관적 행 락 (<code>FOR UPDATE</code>)</td><td>공유 + 고경합 + 보호 대상이 DB 안</td><td>세 조건이 전부 들어맞는다</td></tr>
+    </table>
+
+    <p>구조는 v2와 <strong>정반대</strong>다. DB 행 락은 <em>커밋되는 순간</em> 풀리므로,
+    락 획득·검사·발급을 전부 <strong>하나의 <code>@Transactional</code> 안</strong>에 넣는다
+    (단일 빈, 파사드 없음 — tx ⊃ 락이 자연 성립). 락을 잡은 <em>뒤에</em> 검사해야 stale 읽기가 원천 봉쇄된다.</p>
+
+    <pre class="code"><span class="cm">// v3 — 하나의 @Transactional 안: 행 락 → 검사 → 발급 → 커밋(=락 해제)</span>
+<span class="kw">@Transactional</span>
+public CouponIssueResponse issue(Long couponId, Long userId) {
+    Coupon coupon = couponRepository.<span class="st">findByIdForUpdate</span>(couponId)  <span class="cm">// SELECT ... FOR UPDATE — 행 락 획득(대기)</span>
+            .orElseThrow(...);
+    ...                                                          <span class="cm">// 락을 쥔 채 검사·발급</span>
+    coupon.issue();
+    couponIssueRepository.save(new CouponIssue(couponId, userId));
+    ...
+}                                                                <span class="cm">// 커밋 — 이 순간 행 락이 풀린다</span></pre>
+
+    <p>실측: <strong>actual=100, PASS.</strong> 직렬화 지점이 로컬 모니터에서 <em>공유 DB 행</em>으로 이동했다.
+    인스턴스를 늘려도 모두 같은 행 락을 거치므로 정합이 경계를 넘는다 —
+    단, 이것도 단일 JVM 측정에서는 <em>개념적 보장</em>이다(다중 인스턴스 실증은 다음 과제로 명시해 둔다).</p>
+
+    <div class="note"><span class="mk">📊 이 선택에 딸려오는 비용 — 풀 압박.</span>
+    <code>FOR UPDATE</code>는 커넥션을 <em>쥔 채</em> 행 락을 기다린다(P4). 부하 중 풀을 들여다보면:
+    <strong>active 10/10(포화), pending 189, idle 0.</strong> 결함이 아니라 이 선택의 특성이다 —
+    풀 크기·타임아웃을 핀으로 박아 측정·튜닝하는 대상.</div>
+
+    <p>흥미로운 건 <strong>503이 0건</strong>이라는 점이다. 풀이 포화됐는데 왜 아무도 타임아웃당하지 않았나?
+    임계 구간이 짧아서(검사+INSERT+커밋, 수 ms) 커넥션이 빠르게 순환했고, 어느 대기자도
+    커넥션 타임아웃 30s를 넘기지 않았다. 즉 — <strong>이 조건에서 DB 행 락은 경합을 거절(503)이 아니라
+    지연(성공 p95 2.6s)으로 흡수한다.</strong> "타임아웃이 안 났다"는 빈칸이 아니라, 이 버전의 경합 흡수
+    방식을 보여주는 적극적인 관찰(음성 결과)이다.</p>
+
+    <div class="stats">
+      <div class="stat"><div class="sl">정합 (actual)</div><div class="sv good">100 / 100</div><div class="sn">PASS</div></div>
+      <div class="stat"><div class="sl">성공 처리량</div><div class="sv">317.5/s</div><div class="sn">자체 특성으로만 읽기</div></div>
+      <div class="stat"><div class="sl">성공 p95</div><div class="sv">2630ms</div><div class="sn">경합 = DB 대기열</div></div>
+      <div class="stat"><div class="sl">503 거절</div><div class="sv">0</div><div class="sn">지연으로 흡수(음성 결과)</div></div>
+      <div class="stat"><div class="sl">풀 (Hikari)</div><div class="sv bad">10/10</div><div class="sn">pending 189</div></div>
+    </div>
+
+    <div class="metaphor"><span class="mk">📒 비유.</span> 막대를 <em>중앙 장부(DB)</em>가 직접 들고 있다.
+    어느 건물이든 그 줄(row)을 고치려면 중앙 장부를 거쳐야 하고, 장부는 한 번에 한 명에게만 그 줄을 내준다.
+    건물이 몇 개든 장부는 하나라, 경계를 넘어 통한다.</div>
+
+    <div class="blocked"><b>그런데 한 가지 질문이 남는다:</b> 직렬화 부담을 전부 DB가 떠안고 있고, 락 경합이
+    커넥션 풀을 잠근다. 락을 DB <em>밖</em>으로 빼면 — 예컨대 Redis로 — DB 부하를 분리하고,
+    DB와 무관한 임계 구간(외부 API 호출 같은)도 보호할 수 있지 않을까? 트렌드이기도 하니, 끝까지 가 보자. → v4</div>
+  </div>
+  <!-- ===== v4 ===== -->
+  <div class="ver" id="v4">
+    <div class="ver-tag"><span class="vn">v4</span><span class="badge pass">PASS (≤ total, 초과 0)</span><span class="badge scope">다중 인스턴스 (외부 Redis)</span></div>
+    <h3>Redisson RLock — 전용 열쇠 부스를 둔다</h3>
+    <div class="ver-sub">정합 범위: 다중(외부 Redis) · 경합 흡수: fail-fast(거절) · 갱신: 워치독</div>
+
+    <p>직렬화 좌표를 DB도 JVM도 아닌 <em>외부 Redis</em>로 옮긴다. v3 대비 무엇이 더해지고 무엇이 딸려오는지부터
+    표로 갈라 두자 — 이 표가 §6 결정의 재료가 된다.</p>
+
+    <table class="choices">
+      <tr><th>축</th><th>DB 행 락 (v3)</th><th>Redis 분산 락 (v4·v5)</th></tr>
+      <tr><td>보호 대상이 DB 안</td><td>락↔데이터가 같은 시스템 — 원자적</td><td>락↔데이터가 분리 — 틈이 생긴다(§4)</td></tr>
+      <tr><td>보호 대상이 DB 밖</td><td>닿지 않음 (DB 트랜잭션 밖)</td><td><strong>적합</strong> — 외부 API 멱등성 등 임의 구간 보호</td></tr>
+      <tr><td>DB 부하</td><td>락 경합이 DB·커넥션 풀에 실림</td><td>락 경합을 DB 밖으로 분리</td></tr>
+      <tr><td>인프라 비용</td><td>추가 0</td><td>Redis 운영 + <dfn class="term" data-term="SPOF (단일 장애점)" data-def="Single Point of Failure — 이 하나가 죽으면 전체가 멈추는 구성 요소. 단일 Redis 노드 분산 락의 고질적 약점.">SPOF</dfn></td></tr>
+      <tr><td>다중 인스턴스 정합</td><td>공유 DB 행으로 <em>이미</em> 확보</td><td>공유 Redis로 확보 — v3 대비 범위가 <em>늘어나는 게 아님</em></td></tr>
+    </table>
+
+    <p>구현은 Redisson 라이브러리의 <code>RLock</code>. 두 가지 운영 결정이 이 버전의 정체성이다:</p>
+    <pre class="code">RLock lock = redissonClient.getLock(<span class="st">"lock:coupon:"</span> + couponId);
+boolean locked = lock.tryLock(<span class="kw">0</span>, TimeUnit.SECONDS);  <span class="cm">// waitTime=0 — 못 잡으면 즉시 503 (fail-fast)</span>
+                                                       <span class="cm">// leaseTime 미지정 — 워치독이 보유 중 자동 연장</span>
+if (!locked) throw new LockNotAcquiredException(couponId);
+try {
+    return inner.issueTx(couponId, userId);            <span class="cm">// 별도 빈 @Transactional — 락 ⊃ tx (v2와 같은 골격)</span>
+} finally {
+    if (lock.isHeldByCurrentThread()) lock.unlock();   <span class="cm">// 미보유 unlock 금지 — 거절이 500으로 새는 것 방지</span>
+}</pre>
+
+    <p><strong><dfn class="term" data-term="fail-fast" data-def="자원을 못 잡으면 기다리지 않고 즉시 실패를 반환하는 정책. 대기 큐가 없는 대신 거절률이 올라간다.">fail-fast</dfn></strong>(waitTime=0):
+    막대가 없으면 줄을 서지 않고 즉시 503으로 돌아간다. 그래서 10초 부하에선 한도를 다 못 채웠다
+    (actual=62) — 이건 정합 실패가 아니라 <em>대기 큐가 없는 정책의 정상 귀결</em>이다.
+    90초로 늘리자 정확히 100으로 수렴했고, 초과는 단 한 건도 없었다. 합격 기준은 <code>actual ≤ total</code>(초과 0).</p>
+
+    <p><strong><dfn class="term" data-term="워치독 (watchdog)" data-def="Redisson이 락 보유 중 백그라운드에서 TTL을 주기적으로 연장해 주는 장치. 작업이 길어져도 보유 중 만료를 막는다.">워치독</dfn></strong>(leaseTime 미지정):
+    일하는 동안 비서가 자동으로 시간을 연장해 준다. 고정 시간을 박았다가 작업이 길어지면
+    보유 중에 락이 만료되는 사고(§4)가 나기 때문이다.</p>
+
+    <div class="stats">
+      <div class="stat"><div class="sl">정합 (actual)</div><div class="sv good">≤ total ✓</div><div class="sn">10s 62 → 90s 100 수렴, 초과 0</div></div>
+      <div class="stat"><div class="sl">성공 처리량</div><div class="sv">6.3/s</div><div class="sn">⚠ §5 — 비교 금지</div></div>
+      <div class="stat"><div class="sl">성공 p95</div><div class="sv">418ms</div><div class="sn">거절 p95는 50ms</div></div>
+      <div class="stat"><div class="sl">503 거절률</div><div class="sv">99.9%</div><div class="sn">전부 ⓒ 락 미획득 (249,563건)</div></div>
+    </div>
+
+    <p class="dim" style="font-size:14px">거절률 99.9%는 "분산 락은 다 이렇다"가 아니라
+    <em>단일 핫키 + 즉시실패</em> 조합의 귀결이다. 키가 분산되거나 짧은 대기를 주면 달라진다.
+    한편 v3에서 음성이던 503 분류 코드는 여기서 249,563건 전부가 미분류 0으로 라우팅되며 실주행이 증명됐다.</p>
+
+    <div class="metaphor"><span class="mk">🔑 비유.</span> 모든 건물이 들르는 <em>별도 열쇠 부스(Redis)</em>를 둔다.
+    열쇠를 받아야 발급하고, 일하는 동안 비서(워치독)가 반납 시간을 자동 연장해 준다.
+    열쇠가 없으면? 기다리지 않고 즉시 돌아간다(fail-fast).</div>
+
+    <div class="blocked"><b>막힌 것이 아니라, 확인하고 싶은 것:</b> Redisson이 <em>대신 해주는</em> 것 —
+    자동 갱신과 안전한 해제 — 의 정체를 분리해 보고 싶다. 그걸 손으로 직접 짜 보면
+    "라이브러리가 사주는 안전"과 "어느 쪽도 못 사주는 안전"이 갈라진다. → v5</div>
+  </div>
+
+  <!-- ===== v5 ===== -->
+  <div class="ver" id="v5">
+    <div class="ver-tag"><span class="vn">v5</span><span class="badge pass">PASS</span><span class="badge scope">다중 인스턴스 (외부 Redis)</span></div>
+    <h3>커스텀 SET NX + Lua — 부스의 작동 원리를 직접 만든다</h3>
+    <div class="ver-sub">정합 범위: 다중(외부 Redis) · 경합 흡수: fail-fast(거절) · 갱신: 고정 TTL 30s 무갱신</div>
+
+    <p>분산 락의 원리는 두 문장이다. 획득은 <strong><code>SET key token NX PX ttl</code></strong> —
+    "고리가 비었을 때만(NX) 내 이름표(token)를 건다, 유효시간(TTL)과 함께".
+    해제는 <strong>Lua compare-and-delete</strong> — "뗄 때 <em>아직 내 이름표일 때만</em> 뗀다".</p>
+
+    <pre class="code"><span class="cm">// 획득 — 비어 있을 때만 내 토큰으로 세팅 (원자적)</span>
+redis.opsForValue().setIfAbsent(key, token, Duration.ofMillis(ttl));   <span class="cm">// SET NX PX</span>
+
+<span class="cm">// 해제 — 내 토큰일 때만 삭제 (Lua라서 get-비교-del이 원자적)</span>
+<span class="st">"if redis.call('get', KEYS[1]) == ARGV[1]
+   then return redis.call('del', KEYS[1]) else return 0 end"</span></pre>
+
+    <p>해제에 왜 Lua까지 동원하나? 그냥 <code>DEL</code> 하면, 내 락이 만료되고 <em>남이 새로 잡은 락</em>을
+    내가 지워버릴 수 있다(오해제). compare-del은 그 사고를 막는다 — 단, 이게 막아주는 건
+    <em>오해제</em>뿐이라는 사실이 §4의 복선이다.</p>
+
+    <div class="trap"><span class="mk">⚠ 구현 함정 — 직렬화 불일치.</span>
+    기본 <code>RedisTemplate</code>의 value 직렬화가 JSON이면 토큰에 따옴표가 붙는다.
+    Lua의 raw 문자열 비교가 <em>조용히 항상 실패</em> → 해제 불가 → 매 요청이 TTL 30초까지 락을 점유.
+    에러도 안 나서 잡기 어렵다. 락 전용 <code>StringRedisTemplate</code>으로 획득/해제의 직렬화를 일치시켜 회피했다
+    (스모크: 2연속 발급이 즉시 성공 = 매번 해제되고 있음).</div>
+
+    <p>갱신 정책은 v4와 반대로 <strong>고정 TTL 30초, 무갱신</strong>. 정상 경로의 락 보유 시간은 수 ms라
+    TTL 30s를 넘길 일이 없다 — 그래서 정상 부하에선 워치독과 고정 TTL을 <em>구별할 수 없다</em>
+    (이 사실이 §5의 두 번째 함정으로 이어진다).</p>
+
+    <div class="stats">
+      <div class="stat"><div class="sl">정합 (actual)</div><div class="sv good">100 / 100</div><div class="sn">PASS, 초과 0</div></div>
+      <div class="stat"><div class="sl">성공 처리량</div><div class="sv">28.4/s</div><div class="sn">⚠ §5 — 비교 금지</div></div>
+      <div class="stat"><div class="sl">성공 p95</div><div class="sv">106ms</div><div class="sn">거절 p95는 66ms</div></div>
+      <div class="stat"><div class="sl">503 거절률</div><div class="sv">99.7%</div><div class="sn">전부 ⓒ (281,977건)</div></div>
+    </div>
+
+    <div class="metaphor"><span class="mk">🏷️ 비유.</span> 부스 직원이 하던 일을 직접 한다.
+    <em>SET NX</em> = 빈 고리에만 내 이름표를 건다. <em>Lua compare-del</em> = 뗄 때 아직 내 이름표인지 확인하고 뗀다.
+    그리고 비서(워치독) 없이 — 30초가 지나면 이름표는 무조건 떨어진다.</div>
+
+    <div class="blocked"><b>이제 마지막 질문:</b> 워치독이든 고정 TTL이든 — 락에 "만료"가 존재하는 한,
+    <em>쥔 채로 만료되면</em> 무슨 일이 벌어지는가? 정상 부하에선 절대 안 일어나니, 일부러 일으켜 보자. → §4</div>
+  </div>
+
+  <!-- 락 위치 한눈에 -->
+  <h3 style="margin-top:46px">한눈에 — 막대의 위치가 정합 범위를 정한다</h3>
+  <div class="loc-diagram">
+    <div class="loc"><div class="li">🏢</div><h4>v2 · JVM 안</h4><p>모니터(프로세스 내 객체)</p><span class="scope-pill s1">서버 2대 = 막대 2개 → 깨짐</span></div>
+    <div class="loc"><div class="li">📒</div><h4>v3 · 공유 DB 안</h4><p>행 잠금 (중앙 장부)</p><span class="scope-pill s2">서버 여러 대 OK · 락↔데이터 한몸</span></div>
+    <div class="loc"><div class="li">🔑</div><h4>v4·v5 · 외부 Redis</h4><p>열쇠 부스 (락 전용 저장소)</p><span class="scope-pill s2">DB 밖 임의 구간도 보호 · 단, 락↔데이터 분리</span></div>
+  </div>
+  <p class="dim" style="font-size:14px">락을 바깥으로 옮길수록 더 넓은 범위를 아우르지만 — 그만큼 새로운 비용(운영, SPOF)과
+  새로운 실패 양식이 따라온다. 그 실패 양식이 바로 다음 장이다.</p>
+</section>
+<!-- ======================== 4. 스톨 데모 ======================== -->
+<section id="stall">
+  <div class="kicker">Part 4 · The Stall Demo</div>
+  <h2>락을 쥔 채 만료되면 — <span class="it">fencing</span>의 부재</h2>
+  <p class="lede">통제 실험이다. 한도 1짜리 쿠폰에 <strong>TTL 1초 &lt; 작업 정지(stall) 3초</strong>를 일부러 박았다.
+  홀더 A가 락을 쥔 채 3초간 멈추는 동안 — GC pause나 네트워크 단절이 현실에서 일으키는 바로 그 상황 —
+  A의 TTL이 먼저 만료된다. 그 순간 B가 "비어 있는" 고리에 자기 이름표를 건다.</p>
+
+  <div class="stall">
+    <div class="lc-title" style="font-family:var(--display);font-style:italic;font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute);margin-bottom:6px">total=1 · ttl=1s &lt; stall=3s · 순차 트리거</div>
+    <div class="stall-track">
+      <div class="stall-row">
+        <span class="who">홀더 A</span>
+        <div class="seg hold" style="flex:0 0 22%">락 획득·read</div>
+        <div class="seg stall-seg" style="flex:0 0 30%">스톨 3s…</div>
+        <div class="seg expired" style="flex:0 0 18%">(TTL 만료됨)</div>
+        <div class="seg stall-seg" style="flex:0 0 22%">…발급·커밋</div>
+      </div>
+      <div class="stall-row">
+        <span class="who">홀더 B</span>
+        <div class="seg expired" style="flex:0 0 52%;border:none"></div>
+        <div class="seg steal" style="flex:0 0 40%">만료된 락 획득 → 발급 → 커밋</div>
+      </div>
+      <div class="stall-mark" style="left:46%"><span class="ml">TTL 만료</span></div>
+    </div>
+    <div class="legend">
+      결과 — A의 해제 시도: <code>released=false</code> (compare-del이 "내 이름표가 아니다"를 보고 <strong style="color:var(--green)">해제 거부 ✓</strong>)
+      &nbsp;·&nbsp; 그럼에도 <strong style="color:var(--red)">actual=2 &gt; total=1</strong> — 두 홀더가 <strong style="color:var(--red)">동시 점유 ✗</strong>, 둘 다 발급됨.
+    </div>
+  </div>
+
+  <p>이 한 줄이 시리즈 전체에서 가장 중요한 발견이다:</p>
+  <p class="lede"><strong>안전한 해제(오해제 차단)와 상호배제(동시 점유 차단)는 별개다.</strong>
+  compare-del은 전자만 준다. 후자 — 만료-중간탈취로 두 홀더가 겹치는 것 — 는
+  <dfn class="term" data-term="fencing token" data-def="락 획득마다 단조 증가하는 번호를 발급하고, 자원(DB 등) 측에서 '더 낮은 번호의 쓰기를 거부'하도록 검증하는 장치. 분산 락의 만료-중간탈취를 자원 쪽에서 최종 차단한다.">fencing token</dfn>
+  (자원 측에서 번호표를 검증하는 장치) 없이는 <em>어느 분산 락도 막지 못한다.</em>
+  워치독(v4)도 마찬가지다 — GC pause나 네트워크 단절 앞에서는 갱신 자체가 멈추므로 같은 구멍이 열린다.</p>
+
+  <div class="metaphor"><span class="mk">🎫 비유 — 번호표.</span> 진짜 해법은 부스가 아니라 <em>창구(자원)</em> 쪽에 있다.
+  락을 받을 때마다 증가하는 번호표를 주고, 장부가 "37번 이후만 받습니다, 36번은 거부"라고 검증하면
+  늦게 깨어난 옛 홀더의 쓰기를 장부가 쳐낸다. 이 검증을 자원이 안 하면 — 부스를 아무리 잘 만들어도 못 막는다.</div>
+
+  <div class="note"><span class="mk">📌 범위 한정.</span> 위의 actual=2는 <em>데모의 통제 산물</em>이다 —
+  TTL을 일부러 작업보다 짧게 박았다. 정상 운영의 v4·v5는 둘 다 초과 0이었다.
+  이 데모가 말하는 건 "v4·v5가 틀렸다"가 아니라, <strong>락과 데이터를 다른 시스템으로 분리하는 순간
+  구조적으로 열리는 틈이 존재한다</strong>는 것이다. 그리고 —
+  락과 데이터가 <em>같은 트랜잭션 안</em>에 있는 v3는 락이 커밋과 함께 풀리므로
+  "쥔 채 만료"라는 사건 자체가 성립하지 않는다. 이 차이가 §6 결정의 핵심 근거가 된다.</div>
+</section>
+
+<!-- ======================== 5. 숫자 읽는 법 ======================== -->
+<section id="numbers">
+  <div class="kicker">Part 5 · Reading the Numbers</div>
+  <h2>왜 처리량으로 <span class="it">우승자를 뽑지 않았나</span></h2>
+  <p class="lede">다섯 버전의 성공 처리량을 한 줄에 적으면 이렇다 —
+  404.0 / 263.6 / 317.5 / 6.3 / 28.4 (/s). 이 숫자들을 나란히 놓고
+  "v4가 제일 느린 락"이라거나 "DB 락이 synchronized보다 빠르다"고 읽고 싶어진다.
+  <strong>둘 다 틀린 독해다.</strong> 이 실험에서 가장 공들인 규율이 바로 이것이다.</p>
+
+  <h3>함정 1 — 변한 건 락의 위치만이 아니다</h3>
+  <p>v2·v3은 막히면 <em>기다리고</em>(park / DB 대기열), v4·v5는 막히면 <em>즉시 거절</em>한다(fail-fast).
+  같은 "성공 처리량" 컬럼이라도, 대기 정책은 경합을 전부 성공으로 흘려보내고
+  거절 정책은 경합의 99%를 503으로 배출한 뒤의 숫자다. 락 위치와 경합 정책이 <em>동시에</em> 움직였으니,
+  처리량 격차의 원인이 어느 쪽인지 이 측정만으로는 가릴 수 없다 —
+  <dfn class="term" data-term="교란 변수 (confounding)" data-def="비교하려는 변수와 함께 움직여 버려서, 결과 차이의 원인을 가릴 수 없게 만드는 제3의 변수.">교란 변수</dfn>다.
+  사과(지연으로 흡수)와 오렌지(거절로 배출)를 한 그래프에 그린 셈이다.</p>
+  <p>그래서 별도의 <strong>통제 재실험</strong>을 돌렸다 — 경합 정책을 전 버전 "유한 대기"로 통일하고
+  락 위치만 바꿔서. 그러자 원래의 극적인 격차는 작은 단조 비용(락이 멀수록 약간 비쌈)으로 수렴했고,
+  v3 &gt; v2 같은 "반전"도 함께 무너졌다. 원래 격차의 지배 변수는 락의 기질이 아니라 경합 처리 방식이었던 것이다.
+  잘 나온 자기 수치라도, 교란이 있으면 헤드라인으로 쓰지 않는다.</p>
+
+  <h3>함정 2 — 정상 부하는 갱신 정책을 가릴 수 없다</h3>
+  <p>v5(28.4/s)가 v4(6.3/s)보다 빨랐다고 "고정 TTL이 워치독보다 빠르다"고 읽어도 틀린다.
+  락 보유 시간(수 ms)이 TTL(30s)보다 압도적으로 짧아, 정상 부하에선 고정 TTL이 중간에 만료될 일이
+  없다 — 즉 워치독이 막아줄 사건 자체가 안 생긴다. 두 버전의 처리량 차이는 갱신 정책이 아니라
+  대기/락 구현의 아티팩트(Redisson의 pub/sub + 갱신 스케줄링 vs 가벼운 SET NX)다.
+  갱신 정책의 진짜 차이는 §4처럼 <em>보유 시간 &gt; TTL</em>인 조건에서만 드러난다.</p>
+
+  <div class="trap"><span class="mk">⚠ 가져갈 규율.</span>
+  ① 정합성 판정은 카운터가 아니라 행 수로(단일 진실 소스).
+  ② 버전 간 처리량 직접 비교 금지 — 비교하려면 교란 변수를 통제한 별도 실험으로.
+  ③ "안 일어난 일"(503=0, 갱신 정책 무차이)도 빈칸이 아니라 기록할 발견이다.</div>
+
+  <h3>합법적인 비교 — 세 축으로 본 다섯 버전</h3>
+  <div class="tbl-scroll">
+  <table class="compare">
+    <tr><th></th><th>v1</th><th>v2</th><th>v3</th><th>v4</th><th>v5</th></tr>
+    <tr><td>정합 actual (total=100)</td><td class="bad">999</td><td class="good">100</td><td class="good pick">100</td><td class="good">≤total ✓</td><td class="good">100</td></tr>
+    <tr><td>초과 발급</td><td class="bad">+899</td><td>0</td><td class="pick">0</td><td>0</td><td>0</td></tr>
+    <tr><td>정합 범위</td><td>없음</td><td>단일 JVM</td><td class="pick">다중 (공유 DB행)</td><td>다중 (외부 Redis)</td><td>다중 (외부 Redis)</td></tr>
+    <tr><td>경합 흡수</td><td>무시(초과)</td><td>park</td><td class="pick">DB 대기열(지연)</td><td>fail-fast(거절)</td><td>fail-fast(거절)</td></tr>
+    <tr><td>갱신 정책</td><td>—</td><td>—</td><td class="pick">tx와 한몸</td><td>워치독</td><td>고정 TTL 30s</td></tr>
+    <tr><td>fencing 틈</td><td>—</td><td>—</td><td class="good pick">구조적으로 없음</td><td class="bad">있음</td><td class="bad">있음</td></tr>
+    <tr><td>맞는 조건</td><td>초과 허용 집계</td><td>단일 JVM·단순성</td><td class="pick">고경합·보호 대상 DB 안</td><td>비-DB 구간·부하 분리</td><td>좌동(원리 노출)</td></tr>
+  </table>
+  </div>
+</section>
+
+<!-- ======================== 6. 결정 ======================== -->
+<section id="verdict">
+  <div class="kicker">Part 6 · The Verdict</div>
+  <h2>사다리를 <span class="it">한 칸 내려와서</span> — v3</h2>
+  <p class="lede">분산 락까지 직접 구현해 보고 — 정규 발급 경로 <code>POST /api/coupons/issue</code>는
+  <strong>v3(DB 비관적 행 락)에 배선했다.</strong> v1·v2·v4·v5는 비교 실험용으로 코드에 공존하되 운영 트래픽과 무관하다.</p>
+
+  <h3>핵심 근거 — 락과 데이터가 한몸이다</h3>
+  <p>이 워크로드의 임계 구간은 <em>그 자체로 DB 쓰기</em>다(coupon 행 UPDATE + coupon_issue INSERT).
+  보호할 대상이 이미 DB 안에 있다. v3는 락(FOR UPDATE 행 락)과 데이터가 <strong>같은 DB, 같은 트랜잭션</strong> 안에 있어
+  원자적이다 — 락은 커밋과 함께 풀리므로 "쥔 채 만료"가 성립하지 않고, <strong>fencing 틈이 구조적으로 없다.</strong>
+  락을 Redis로 빼는 순간 락↔데이터가 다른 시스템으로 분리되고 그 틈이 열린다 —
+  §4 스톨 데모의 actual=2가 그 틈의 실측 증거다.</p>
+  <p><strong>그래서 v3는 v4·v5보다 단지 "충분"한 게 아니라, 이 워크로드에선 더 안전하다.</strong>
+  "왜 분산 락(트렌드)을 안 썼나"의 답은 트렌드 무지가 아니라 워크로드 적합성 판단이다 —
+  사다리를 끝까지 올라가 본 뒤에 내린.</p>
+
+  <h3>근거 보강 — 그리고 정직한 꼬리표</h3>
+  <p><em>다중 인스턴스 정합도 v3가 이미 준다.</em> 공유 DB 행 락이라 인스턴스를 늘려도 모두 같은 행 락을 거친다 —
+  Redis는 스케일아웃의 전제가 아니다. v4·v5가 v3 너머로 더해주는 건 정합의 <em>범위</em>가 아니라
+  "DB 밖 임계 구간 보호"뿐이다. (단, 이 다중 인스턴스 정합은 단일 JVM 측정에선 <em>개념적 보장</em>이다 —
+  다중 인스턴스 실측은 다음 과제로 백로그에 명시해 두었다.)</p>
+  <p><em>대가는 수용 가능하다.</em> v3의 풀 압박(active 10/10, pending 189)은 측정·튜닝 가능한 비용이고
+  이 워크로드 규모에서 감당된다. <em>그리고 처리량은 근거로 쓰지 않았다</em> — §5의 규율 그대로.
+  결정의 근거는 빠름이 아니라 구조적 안전이다.</p>
+
+  <h3>이 결정의 범위 — 조건이 바뀌면 답도 바뀐다</h3>
+  <p>이 선택은 인프라 맥락의 함수다. Redis가 이미 핵심 캐시로 깔려 있고, DB 부하 분리가 절실하고,
+  보호 대상이 <em>DB 밖</em>(외부 API 호출의 멱등성 같은)이라면 — 그때는 락을 데이터에서 떼어낼 수밖에 없으니
+  분산 락이 본래 자리를 찾고, v4로 간다. 분산 락이 틀린 도구인 게 아니라,
+  <strong>DB 행을 보호하는 일에 락을 데이터에서 떼어내는 것이 역효과</strong>(fencing 틈 + SPOF)일 뿐이다.</p>
+
+  <div class="ledger-card">
+    <div class="lc-title">최종 장부 — 이 시리즈가 남긴 것</div>
+    <div class="ledger-rows">
+      <div class="lrow"><span class="k">초과 발급</span><span class="v"><span class="bad" style="color:var(--red)">999</span> → <span class="good" style="color:var(--green)">0</span></span></div>
+      <div class="lrow"><span class="k">정규 발급 경로</span><span class="v">v3 · SELECT FOR UPDATE</span></div>
+      <div class="lrow"><span class="k">결정의 근거</span><span class="v" style="font-size:13.5px">락↔데이터 동치 (fencing 틈 없음)</span></div>
+      <div class="lrow"><span class="k">처리량 우승자</span><span class="v" style="font-size:13.5px">뽑지 않음 (§5 규율)</span></div>
+    </div>
+  </div>
+</section>
+<!-- ======================== 부록 · 용어 ======================== -->
+<section id="glossary">
+  <div class="kicker">Appendix · Glossary</div>
+  <h2>용어 정리</h2>
+  <p class="dim">본문에 점선 밑줄로 등장한 용어 + 함께 알아두면 좋은 용어. 가나다·알파벳 혼합 순.</p>
+  <div class="glossary">
+    <div class="gl-item"><div class="gt">check-then-act</div><div class="gd">"확인하고 행동한다"가 두 단계로 쪼개진 패턴. 확인과 행동 사이에 다른 스레드가 끼어들면 확인이 무효가 된다. <code>if (issued &lt; total) issued++</code>가 전형.</div></div>
+    <div class="gl-item"><div class="gt">레이스 컨디션 (race condition)</div><div class="gd">실행 타이밍(누가 먼저 끼어드는가)에 따라 결과가 달라지는 상황. 동시성 버그의 뿌리.</div></div>
+    <div class="gl-item"><div class="gt">lost update (갱신 손실)</div><div class="gd">두 실행 주체가 같은 값을 읽고 각자 갱신하면, 나중에 쓰는 쪽이 앞의 갱신을 덮어써 한 번의 갱신이 사라지는 현상. v1에서 카운터가 100에 캡된 이유.</div></div>
+    <div class="gl-item"><div class="gt">임계 구간 (critical section)</div><div class="gd">동시에 둘 이상이 실행하면 결과가 깨지는 코드 구간. 락이 보호하는 대상.</div></div>
+    <div class="gl-item"><div class="gt">직렬화 (serialization, 동시성 맥락)</div><div class="gd">동시에 들어온 요청을 한 줄로 세워 한 번에 하나씩 처리하게 만드는 것. 정합의 대가로 대기 또는 거절이 발생한다.</div></div>
+    <div class="gl-item"><div class="gt">락 (lock) / 모니터 (monitor)</div><div class="gd">임계 구간에 한 번에 하나만 들어가게 강제하는 장치. 자바에서 모든 객체에 내장된 락을 모니터라 하며 <code>synchronized</code>가 이를 사용한다.</div></div>
+    <div class="gl-item"><div class="gt">park</div><div class="gd">락을 기다리는 스레드를 OS 수준에서 재워 두는 것. v2의 경합 흡수 방식 — 거절 없이 무한 대기.</div></div>
+    <div class="gl-item"><div class="gt">낙관적 락 (optimistic lock)</div><div class="gd">락을 잡지 않고 일단 진행한 뒤, 커밋 시점에 버전 번호로 충돌을 감지하면 재시도하는 방식. 충돌이 드문 저경합에 적합 — 단일 핫키 고경합에선 재시도 폭풍.</div></div>
+    <div class="gl-item"><div class="gt">비관적 락 (pessimistic lock) / <code>SELECT … FOR UPDATE</code></div><div class="gd">읽는 시점에 미리 행 락을 잡아 남이 못 건드리게 하는 방식. DB가 락을 관리하며 커밋 시 해제. v3의 메커니즘.</div></div>
+    <div class="gl-item"><div class="gt">핫키 (hot key)</div><div class="gd">동시 요청이 한 개의 키/행에 집중되는 상황(이 실험: couponId=1 하나). 경합의 밀도를 정하는 조건.</div></div>
+    <div class="gl-item"><div class="gt">프록시 (Spring AOP proxy)</div><div class="gd">Spring이 <code>@Transactional</code> 등을 구현하는 방식 — 원본 빈을 감싼 대리 객체가 "tx 시작 → 원본 호출 → 커밋"을 수행. 같은 빈 내부 자기호출은 프록시를 안 거친다.</div></div>
+    <div class="gl-item"><div class="gt">커넥션 풀 / HikariCP</div><div class="gd">DB 커넥션을 미리 만들어 빌려주는 저장소. 이 실험은 풀 크기 10 고정 — 커넥션을 쥔 채 대기하면 풀이 포화된다(active 10/10, pending 189).</div></div>
+    <div class="gl-item"><div class="gt">홀더 (holder)</div><div class="gd">지금 락을 쥐고 있는 주체 — 이 글에선 락을 획득해 발급 작업 중인 요청/스레드. 스톨 데모의 "홀더 A/B"가 이것. "보유 중 만료", "만료-중간탈취"는 전부 홀더 관점의 사건이다.</div></div>
+    <div class="gl-item"><div class="gt">분산 락 (distributed lock)</div><div class="gd">여러 프로세스/서버가 공유하는 외부 저장소(Redis 등)에 두는 락. 프로세스 경계를 넘는 대신 락↔데이터 분리라는 새 위험을 떠안는다.</div></div>
+    <div class="gl-item"><div class="gt"><code>SET NX PX</code></div><div class="gd">Redis 명령 — "키가 없을 때만(NX) 값을 세팅하고 TTL(PX)을 건다". 원자적이라 분산 락 획득의 기본 프리미티브.</div></div>
+    <div class="gl-item"><div class="gt">Lua compare-and-delete</div><div class="gd">"키의 값이 내 토큰일 때만 삭제"를 Lua 스크립트로 원자화한 해제. 오해제(남의 락 삭제)를 막는다 — 단, 상호배제는 못 준다.</div></div>
+    <div class="gl-item"><div class="gt">TTL (time-to-live)</div><div class="gd">키의 유효 시간. 홀더가 죽어도 락이 회수되게 하는 안전핀이지만, 홀더가 살아 있는데 먼저 만료되면 만료-중간탈취가 열린다.</div></div>
+    <div class="gl-item"><div class="gt">워치독 (watchdog)</div><div class="gd">Redisson이 락 보유 중 TTL을 자동 연장해 주는 백그라운드 장치. 보유 중 만료를 좁히지만 — GC pause/네트워크 단절 앞에선 갱신도 멈추므로 fencing을 대체하지 못한다.</div></div>
+    <div class="gl-item"><div class="gt">fail-fast</div><div class="gd">자원을 못 잡으면 기다리지 않고 즉시 실패(503)를 반환하는 정책. 대기 큐가 없는 대신 거절률이 올라간다. v4·v5의 경합 흡수 방식.</div></div>
+    <div class="gl-item"><div class="gt">fencing token (번호표)</div><div class="gd">락 획득마다 단조 증가하는 번호를 발급하고, 자원 측이 낮은 번호의 쓰기를 거부하게 하는 장치. 만료-중간탈취의 최종 방어선 — 자원이 검증하지 않으면 어느 분산 락도 동시 점유를 못 막는다.</div></div>
+    <div class="gl-item"><div class="gt">SPOF (single point of failure)</div><div class="gd">이 하나가 죽으면 전체가 멈추는 구성 요소. 단일 노드 Redis 분산 락의 운영 리스크.</div></div>
+    <div class="gl-item"><div class="gt">단일 진실 소스 (single source of truth)</div><div class="gd">지표들이 갈릴 때 무엇을 믿을지 미리 정한 기준. 이 실험: <code>SELECT COUNT(*) FROM coupon_issue</code> 행 수(actual).</div></div>
+    <div class="gl-item"><div class="gt">교란 변수 (confounding variable)</div><div class="gd">비교 대상과 함께 움직여 인과를 가리는 제3의 변수. 락 위치와 경합 정책이 같이 변한 것이 이 실험의 교란 — 통제 재실험으로 분리했다.</div></div>
+    <div class="gl-item"><div class="gt">음성 결과 (negative result)</div><div class="gd">"일어나지 않았다"는 관찰. v3의 503=0은 빈칸이 아니라 "행 락이 경합을 거절이 아닌 지연으로 흡수한다"는 발견이다.</div></div>
+    <div class="gl-item"><div class="gt">VU / p95 / 409 / 503</div><div class="gd">VU=부하 도구의 가상 사용자. p95=요청 95%가 끝난 응답시간. 409=한도 소진·중복 등 정상 거절. 503=일시적 처리 불가(풀 고갈 ⓐ, 행락 타임아웃 ⓑ, 락 미획득 ⓒ로 서브분류).</div></div>
+  </div>
+</section>
+
+<footer>
+  High-Traffic Lab · Phase 3-3 동시성 락 사다리 — 모든 수치는 동결된 측정 분석(analysis.md, 본 실행 v1~v5 + 스톨 데모)에서 인용<br>
+  후속: 버전별 심화편(v1~v5 각 1편, 이론 포함) 예정
+</footer>
+</div><!-- /container -->
+
+<div id="term-pop" role="tooltip"></div>
+
+<script>
+/* ---------- glossary popover ---------- */
+(function(){
+  var pop = document.getElementById('term-pop');
+  var current = null;
+  function show(t){
+    pop.innerHTML = '<div class="tp-t">'+t.dataset.term+'</div>'+t.dataset.def;
+    pop.style.display='block';
+    var r = t.getBoundingClientRect();
+    var top = r.bottom + window.scrollY + 8;
+    var left = r.left + window.scrollX;
+    var maxLeft = window.scrollX + document.documentElement.clientWidth - pop.offsetWidth - 16;
+    pop.style.top = top+'px';
+    pop.style.left = Math.max(window.scrollX+12, Math.min(left, maxLeft))+'px';
+    current = t;
+  }
+  function hide(){ pop.style.display='none'; current=null; }
+  document.querySelectorAll('dfn.term').forEach(function(t){
+    t.addEventListener('mouseenter', function(){ show(t); });
+    t.addEventListener('mouseleave', hide);
+    t.addEventListener('click', function(e){
+      e.stopPropagation();
+      if(current===t){ hide(); } else { show(t); }
+    });
+  });
+  document.addEventListener('click', function(e){ if(!pop.contains(e.target)) hide(); });
+  window.addEventListener('scroll', function(){ if(current) hide(); }, {passive:true});
+})();
+
+/* ---------- race simulator ---------- */
+(function(){
+  var stepBtn = document.getElementById('sim-step');
+  var resetBtn = document.getElementById('sim-reset');
+  var counterEl = document.getElementById('sim-counter');
+  var actualEl = document.getElementById('sim-actual');
+  var msgEl = document.getElementById('sim-msg');
+  var ths = ['th-a','th-b','th-c'].map(function(id){ return document.getElementById(id); });
+  var logs = ths.map(function(t){ return t.querySelector('.th-log'); });
+  var phase = 0;
+  var START = 97;
+
+  var steps = [
+    function(){ // READ
+      ths.forEach(function(t){ t.classList.add('active'); });
+      logs.forEach(function(l){ l.innerHTML = 'READ  issued = <span class="hl">'+START+'</span>'; });
+      msgEl.innerHTML = '세 스레드가 거의 같은 순간 같은 값 <b style="color:var(--gold)">'+START+'</b>을 읽었다 — 아직 아무도 커밋하지 않았으니까.';
+    },
+    function(){ // CHECK
+      logs.forEach(function(l){ l.innerHTML += '\nCHECK '+START+' &lt; 100 → <span class="hl">통과</span>'; });
+      msgEl.textContent = '셋 다 "아직 한도 미만"이라는 확인을 통과했다. check와 act 사이의 틈이 열렸다.';
+    },
+    function(){ // WRITE
+      logs.forEach(function(l,i){
+        l.innerHTML += '\nWRITE issued = '+(START+1)+(i<2?'  ← 덮어써짐':'');
+      });
+      counterEl.textContent = START+1;
+      actualEl.textContent = START+3;
+      actualEl.classList.add('bad');
+      msgEl.innerHTML = '셋 모두 '+(START+1)+'을 적었다 — 갱신 두 번이 증발(lost update). 장부는 <b>'+(START+1)+'</b>, 실제 발급 행은 <b>'+(START+3)+'</b>. 이 틈이 500 VU × 10초로 늘어나면 actual=999가 된다.';
+      ths.forEach(function(t){ t.classList.remove('active'); });
+      stepBtn.disabled = true;
+    }
+  ];
+
+  function reset(){
+    phase = 0;
+    stepBtn.disabled = false;
+    counterEl.textContent = START;
+    actualEl.textContent = START;
+    actualEl.classList.remove('bad');
+    logs.forEach(function(l){ l.innerHTML=''; });
+    ths.forEach(function(t){ t.classList.remove('active'); });
+    msgEl.textContent = '버튼을 눌러 READ → CHECK → WRITE 순서로 진행해 보자.';
+  }
+  stepBtn.addEventListener('click', function(){
+    if(phase < steps.length){ steps[phase](); phase++; }
+  });
+  resetBtn.addEventListener('click', reset);
+})();
+
+/* ---------- toc active state ---------- */
+(function(){
+  var links = Array.prototype.slice.call(document.querySelectorAll('.toc a'));
+  var sections = links.map(function(a){ return document.querySelector(a.getAttribute('href')); });
+  function onScroll(){
+    var y = window.scrollY + 120;
+    var idx = 0;
+    sections.forEach(function(s,i){ if(s && s.offsetTop <= y) idx = i; });
+    links.forEach(function(a,i){ a.classList.toggle('active', i===idx); });
+  }
+  window.addEventListener('scroll', onScroll, {passive:true});
+  onScroll();
+})();
+</script>
+</body>
+</html>
