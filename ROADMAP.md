@@ -1,11 +1,11 @@
-# 블로그 구축 체크리스트
+# 블로그 로드맵
 
 Jekyll + Chirpy 기반 개발 블로그 (`https://data-sy.github.io`) — 학습 자료 공유 + 구직 겸용
 
 ## A. 레포·뼈대 ✅
 - [x] A1. Chirpy 스타터 템플릿으로 `data-sy.github.io` 레포 생성 + 로컬 클론
 - [x] A2. `setup/chirpy` 작업 브랜치 생성
-- [x] A3. CHECKLIST.md 작성
+- [x] A3. 로드맵 문서 작성 (CHECKLIST.md → ROADMAP.md로 개명)
 
 ## B. 설정 ✅
 - [x] B1. `_config.yml` — url, title, tagline, lang(ko-KR), timezone(Asia/Seoul)
@@ -29,8 +29,20 @@ Jekyll + Chirpy 기반 개발 블로그 (`https://data-sy.github.io`) — 학습
 - [ ] E4. 공유할 자료 큐레이션 (84개 전부 아님 — 정말 유용한 것부터, 점진적으로)
 - [ ] E5. 파일럿 1편 — "동시성 시작 전 알아야 할 사전지식" 게재해보고 방식 확정
 
+## F. Velog 기술글 이관 (→ `AI Programming` 카테고리)
+- [x] F1. 기술글 9편 이관 — AI Assistant #3~#9 + Spring AOP + 웹페이지 접속 과정. 원본 마크다운 충실 이식, 이미지 24개 로컬화 (PR #4)
+- [x] F2. 카테고리 재편 — `[AI Programming, QLT]` 2단계 + ASCII 슬러그(`/categories/ai-programming/`)
+- [x] F3. 타이머 앱 개발기 이미지 표 → flex 좌우 배치, 소개 블록 불릿 정리
+- [ ] F4. **이관 글 미완성 표시 채우기** (원문 충실 이식 원칙상 보존된 작성자 "예정" 자리. 줄번호는 편집 시 밀릴 수 있어 표시 문구 병기)
+  - [ ] `_posts/2025-08-17-ai-assistant-5.md` `(간격 주는 용도의 짤. 넣을 예정)` — 간격용 짤 이미지 추가
+  - [ ] `…ai-assistant-5.md` `(이미지 위치 조절 예정)` — 알림/오디오 세션 이미지 위치 조정
+  - [ ] `…ai-assistant-5.md` `삽질 기록은 여기... (추가 예정)` — "알람 기능 트러블 슈팅" 글 작성 후 링크 연결 (원본 velog 글은 비공개/삭제 상태)
+  - [ ] `…ai-assistant-5.md` `(이전 아키텍처 다이어그램 → 새로운 아키텍처 다이어그램 첨부 예정)` — 클린 아키텍처 전/후 다이어그램 첨부
+  - [ ] `_posts/2025-09-21-ai-assistant-9.md` `*Suspended*문제*(링크 연결 예정)*` — #5의 Suspended 단락으로 링크 연결
+- [ ] F5. (사용자) 이관·검증 완료 후 Velog 원본 글 삭제
+
 ## 후속 (선택)
 - [ ] 아바타 이미지 추가 (`_config.yml`의 `avatar`)
 - [ ] 댓글 시스템 (giscus 추천) 연동
-- [ ] 로컬 미리보기용 Ruby 3.x 설치
+- [x] 로컬 미리보기용 Ruby 3.x 설치 (Homebrew `ruby@3.4`)
 - [ ] Google 검색 등록 (`webmaster_verifications`)
