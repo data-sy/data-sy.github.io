@@ -1,7 +1,7 @@
 ---
 title: "[AI Assistant #3] AI가 짜준 코드의 한계 — 설정 책임을 어느 모델에 둘지는 내가 정하자"
 date: 2025-08-03 12:14:47 +0900
-categories: [타이머 앱 개발기]
+categories: [AI 프로그래밍, QLT]
 tags: [iOS, SwiftUI, AI, 회고]
 description: AI가 짜주는 대로 따라가다 보니 세부 설계가 비었다. 소리·진동 on/off 설정 책임을 UserSettings에서 TimerData로 옮기며, 설계 주도권은 개발자에게 있다는 걸 체감한 한 주의 기록.
 ---

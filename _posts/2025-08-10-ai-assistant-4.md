@@ -1,7 +1,7 @@
 ---
 title: "[AI Assistant #4] 정책 바뀔 때마다 코드를 고친다고? — SRP로 구조를 다시 세우자"
 date: 2025-08-10 04:10:21 +0900
-categories: [타이머 앱 개발기]
+categories: [AI 프로그래밍, QLT]
 tags: [iOS, SwiftUI, MVVM, 리팩토링, SRP, 회고]
 description: "정책이 바뀔 때마다 코드를 고치는 게 잦아져 구조를 리팩토링했다. View 로직을 ViewModel로, 완료 처리를 Handler로 분리하며 SRP의 필요성을 몸으로 익힌 한 주."
 ---

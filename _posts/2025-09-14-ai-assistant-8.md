@@ -1,7 +1,7 @@
 ---
 title: "[AI Assistant #8] 드디어 출시 준비 — 접근성·크래시 수집부터 앱스토어 심사까지"
 date: 2025-09-14 22:03:17 +0900
-categories: [타이머 앱 개발기]
+categories: [AI 프로그래밍, QLT]
 tags: [iOS, SwiftUI, 출시, 접근성, Crashlytics, 회고]
 description: "남은 버그와 Warning을 정리하고 Crashlytics·VoiceOver를 붙여 v1.0.0을 마무리했다. 앱스토어 메타데이터를 준비해 드디어 심사를 제출한 주."
 ---
