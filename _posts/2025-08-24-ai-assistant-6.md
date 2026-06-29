@@ -7,17 +7,19 @@ description: "단위 테스트는 통과했지만 실기기에선 안 울리는 
 ---
 
 >### ⏰ 퀵라벨타이머 (QuickLabelTimer)
-**플랫폼·기술**: iOS 앱, SwiftUI
-**앱 컨셉**: 시간을 빠르게 설정할 수 있는 **퀵 타이머**에, ‘왜 맞췄는지’를 기록할 수 있는 **라벨 기능**을 결합한 타이머 앱
-**개발 목적**: AI-Assisted Programming을 실제 서비스 개발에 적용하여 **장단점**을 살펴보고, **서비스 완성 및 운영 경험**을 통해 **설계 능력과 문제 해결 능력을 강화**하고자 함
-**GitHub**: https://github.com/data-sy/quick-label-timer
+- **플랫폼·기술**: iOS 앱, SwiftUI
+- **앱 컨셉**: 시간을 빠르게 설정할 수 있는 **퀵 타이머**에, ‘왜 맞췄는지’를 기록할 수 있는 **라벨 기능**을 결합한 타이머 앱
+- **개발 목적**: AI-Assisted Programming을 실제 서비스 개발에 적용하여 **장단점**을 살펴보고, **서비스 완성 및 운영 경험**을 통해 **설계 능력과 문제 해결 능력을 강화**하고자 함
+- **GitHub**: https://github.com/data-sy/quick-label-timer
 
 <br/>
 <br/>
 
 ## 이번 주에 한 일
-| ![](/assets/img/posts/ai-assistant-6/01.png) | ![](/assets/img/posts/ai-assistant-6/02.png) |
-|---|---|
+<div style="display:flex; gap:8px; align-items:flex-start;">
+<div style="flex:1; min-width:0;"><img src="/assets/img/posts/ai-assistant-6/01.png" alt="" style="width:100%; height:auto;" /></div>
+<div style="flex:1; min-width:0;"><img src="/assets/img/posts/ai-assistant-6/02.png" alt="" style="width:100%; height:auto;" /></div>
+</div>
 
 이번 주에는 드디어 **알람 기능을 마무리**했다! 
 지난주에 정리한 정책대로 **'로컬 알림을 짧은 간격으로 연속 울리기'**방식을 적용했고, 그 과정에서 파생된 **UI 정책 수정**까지 함께 진행했다.
@@ -55,8 +57,11 @@ description: "단위 테스트는 통과했지만 실기기에선 안 울리는 
 원래는 사용자가 소리/진동을 각각 On·Off로 고를 수 있게 하려 했는데, 로컬 알림으로 정책을 바꾸니 **“소리 O·진동 X”**을 선택하면, 무음 모드일 때 **정반대로 “소리 X·진동 O”**이 울리는 상황이 벌어졌다. 😂
 혼란스러운 UX이므로 최종적으로는 옵션을 **소리 / 진동 / 무음** 3가지만 제공하는 걸로 단순화했다.
 
-|![](/assets/img/posts/ai-assistant-6/05.png)| **➔**  |![](/assets/img/posts/ai-assistant-6/06.png)|
-|---|---|---|
+<div style="display:flex; gap:8px; align-items:center;">
+<div style="flex:1; min-width:0;"><img src="/assets/img/posts/ai-assistant-6/05.png" alt="" style="width:100%; height:auto;" /></div>
+<div style="flex:0 0 auto;"><strong>➔</strong></div>
+<div style="flex:1; min-width:0;"><img src="/assets/img/posts/ai-assistant-6/06.png" alt="" style="width:100%; height:auto;" /></div>
+</div>
 
 
 <br/>

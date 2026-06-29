@@ -7,18 +7,20 @@ description: "버그 하나를 고치자 영속성·UI·정렬·모델 구조까
 ---
 
 >### ⏰ 퀵라벨타이머 (QuickLabelTimer)
-**플랫폼·기술**: iOS 앱, SwiftUI
-**앱 컨셉**: 시간을 빠르게 설정할 수 있는 **퀵 타이머**에, ‘왜 맞췄는지’를 기록할 수 있는 **라벨 기능**을 결합한 타이머 앱
-**개발 목적**: AI-Assisted Programming을 실제 서비스 개발에 적용하여 장단점을 살펴보고, **서비스 완성 및 운영 경험**을 통해 **설계 능력과 문제 해결 능력을 강화**하고자 함
-**GitHub**: https://github.com/data-sy/quick-label-timer
+- **플랫폼·기술**: iOS 앱, SwiftUI
+- **앱 컨셉**: 시간을 빠르게 설정할 수 있는 **퀵 타이머**에, ‘왜 맞췄는지’를 기록할 수 있는 **라벨 기능**을 결합한 타이머 앱
+- **개발 목적**: AI-Assisted Programming을 실제 서비스 개발에 적용하여 장단점을 살펴보고, **서비스 완성 및 운영 경험**을 통해 **설계 능력과 문제 해결 능력을 강화**하고자 함
+- **GitHub**: https://github.com/data-sy/quick-label-timer
 
 
 <br/>
 <br/>
 
 ## 이번 주에 한 일
-|![](/assets/img/posts/ai-assistant-7/01.png)|![](/assets/img/posts/ai-assistant-7/02.png)|
-|---|---|
+<div style="display:flex; gap:8px; align-items:flex-start;">
+<div style="flex:1; min-width:0;"><img src="/assets/img/posts/ai-assistant-7/01.png" alt="" style="width:100%; height:auto;" /></div>
+<div style="flex:1; min-width:0;"><img src="/assets/img/posts/ai-assistant-7/02.png" alt="" style="width:100%; height:auto;" /></div>
+</div>
 이번 주는 **버그 수정과 리팩토링**을 주로 진행했다. 그 과정에서 알림 동작과 관련된 **예상치 못한 문제를 발견했고**, 정책을 조금 더 **안정적인 방향으로 바꾸게 되었다.** 출시 전에 발견해서 다행이었다.
 
 <br/>

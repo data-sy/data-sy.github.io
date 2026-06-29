@@ -7,18 +7,20 @@ description: "남은 버그와 Warning을 정리하고 Crashlytics·VoiceOver를
 ---
 
 >### ⏰ 퀵라벨타이머 (QuickLabelTimer)
-**플랫폼·기술**: iOS 앱, SwiftUI
-**앱 컨셉**: 시간을 빠르게 설정할 수 있는 **퀵 타이머**에, ‘왜 맞췄는지’를 기록할 수 있는 **라벨 기능**을 결합한 타이머 앱
-**개발 목적**: AI-Assisted Programming을 실제 서비스 개발에 적용하여 장단점을 살펴보고, **서비스 완성 및 운영 경험**을 통해 **설계 능력과 문제 해결 능력을 강화**하고자 함
-**GitHub**: https://github.com/data-sy/quick-label-timer
+- **플랫폼·기술**: iOS 앱, SwiftUI
+- **앱 컨셉**: 시간을 빠르게 설정할 수 있는 **퀵 타이머**에, ‘왜 맞췄는지’를 기록할 수 있는 **라벨 기능**을 결합한 타이머 앱
+- **개발 목적**: AI-Assisted Programming을 실제 서비스 개발에 적용하여 장단점을 살펴보고, **서비스 완성 및 운영 경험**을 통해 **설계 능력과 문제 해결 능력을 강화**하고자 함
+- **GitHub**: https://github.com/data-sy/quick-label-timer
 
 <br/>
 <br/>
 
 ## 이번 주에 한 일
 
-| ![](/assets/img/posts/ai-assistant-8/01.png) | ![](/assets/img/posts/ai-assistant-8/02.png) |
-|---|---|
+<div style="display:flex; gap:8px; align-items:flex-start;">
+<div style="flex:1; min-width:0;"><img src="/assets/img/posts/ai-assistant-8/01.png" alt="" style="width:100%; height:auto;" /></div>
+<div style="flex:1; min-width:0;"><img src="/assets/img/posts/ai-assistant-8/02.png" alt="" style="width:100%; height:auto;" /></div>
+</div>
 이번 주는 남은 버그와 Warning을 해결하고 로그 시스템과 접근성을 붙여 **v1.0.0 개발을 마무리했다.** 그리고 스토어에 올릴 메타데이터(제목, 설명, 미리보기 등)를 준비해서 해 드디어 **심사를 제출했다.**
 
 <br/>

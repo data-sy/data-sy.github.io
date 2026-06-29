@@ -7,10 +7,10 @@ description: "심사 리젝 두 번을 넘어 드디어 출시. 백그라운드 
 ---
 
 >### ⏰ 퀵라벨타이머 (QuickLabelTimer)
-**플랫폼·기술**: iOS 앱, SwiftUI
-**앱 컨셉**: 시간을 빠르게 설정할 수 있는 **퀵 타이머**에, ‘왜 맞췄는지’를 기록할 수 있는 **라벨 기능**을 결합한 타이머 앱
-**개발 목적**: AI-Assisted Programming을 실제 서비스 개발에 적용하여 장단점을 살펴보고, **서비스 완성 및 운영 경험**을 통해 **설계 능력과 문제 해결 능력을 강화**하고자 함
-**GitHub**: https://github.com/data-sy/quick-label-timer
+- **플랫폼·기술**: iOS 앱, SwiftUI
+- **앱 컨셉**: 시간을 빠르게 설정할 수 있는 **퀵 타이머**에, ‘왜 맞췄는지’를 기록할 수 있는 **라벨 기능**을 결합한 타이머 앱
+- **개발 목적**: AI-Assisted Programming을 실제 서비스 개발에 적용하여 장단점을 살펴보고, **서비스 완성 및 운영 경험**을 통해 **설계 능력과 문제 해결 능력을 강화**하고자 함
+- **GitHub**: https://github.com/data-sy/quick-label-timer
 
 <br/>
 <br/>
