@@ -1,7 +1,7 @@
 ---
 title: "[AI Assistant #7] 버그 하나가 부른 연쇄 수정 — Parallel Change로 모델을 안전하게 바꾸자"
 date: 2025-08-31 11:20:05 +0900
-categories: [AI 프로그래밍, QLT]
+categories: [AI Programming, QLT]
 tags: [iOS, SwiftUI, 리팩토링, ParallelChange, 회고]
 description: "버그 하나를 고치자 영속성·UI·정렬·모델 구조까지 연쇄로 흔들렸다. 마틴 파울러의 Parallel Change로 모델 속성을 안전하게 바꾼 과정."
 ---

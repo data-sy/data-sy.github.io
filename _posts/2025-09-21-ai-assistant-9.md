@@ -1,7 +1,7 @@
 ---
 title: "[AI Assistant #9] 두 번의 리젝을 넘어 출시 — 앱스토어가 알려준 '사용자 중심'"
 date: 2025-09-21 18:26:19 +0900
-categories: [AI 프로그래밍, QLT]
+categories: [AI Programming, QLT]
 tags: [iOS, SwiftUI, 출시, 앱스토어, 회고]
 description: "심사 리젝 두 번을 넘어 드디어 출시. 백그라운드 오디오 옵션, iPad 스크린샷 불일치 등 Apple이 알려준 '사용자 중심' 시각을 정리한 기록."
 ---

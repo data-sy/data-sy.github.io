@@ -1,7 +1,7 @@
 ---
 title: "[AI Assistant #6] 테스트는 통과했는데 실기기에선 안 울린다?! — 가설로 검증한 알람 정책"
 date: 2025-08-24 19:56:34 +0900
-categories: [AI 프로그래밍, QLT]
+categories: [AI Programming, QLT]
 tags: [iOS, SwiftUI, 로컬알림, ADR, 회고]
 description: "단위 테스트는 통과했지만 실기기에선 안 울리는 알림. 실기기에서 직접 가설을 세워 검증하며 '제목·본문 중 하나는 필수' 같은 정책을 확정하고 알람 기능을 마무리한 주."
 ---

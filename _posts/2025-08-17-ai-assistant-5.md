@@ -1,7 +1,7 @@
 ---
 title: "[AI Assistant #5] 알람이 안 울린다?! — iOS Suspended 상태와 '완벽 대신 완성'"
 date: 2025-08-17 10:54:46 +0900
-categories: [AI 프로그래밍, QLT]
+categories: [AI Programming, QLT]
 tags: [iOS, SwiftUI, 알람, 클린아키텍처, 회고]
 description: "앱의 핵심인 알람 기능에 도전했다 삽질의 연속. 실기기에서 소리가 안 난 원인은 애플워치와 iOS Suspended 상태였다. '완벽 대신 완성'을 모토로 로컬 알림 MVP를 택한 기록."
 ---
