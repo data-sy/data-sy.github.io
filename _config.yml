@@ -220,6 +220,7 @@ exclude:
   - docs
   - tools
   - README.md
+  - ROADMAP.md
   - LICENSE
   - purgecss.js
   - "*.config.js"
