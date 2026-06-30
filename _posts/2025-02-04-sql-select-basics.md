@@ -154,8 +154,8 @@ SELECT가 출력 데이터를 선정하는 방식은 세 가지다.
 **프로젝션(PROJECTION)** — **열 단위**로 원하는 데이터를 조회하는 방식
 
 <div style="display:flex; gap:8px;">
-<div style="flex:1;"><img src="/assets/img/posts/sql-select-basics/06.jpeg"></div>
-<div style="flex:1;"><img src="/assets/img/posts/sql-select-basics/07.jpeg"></div>
+<div style="flex:1;"><img src="/assets/img/posts/sql-select-basics/06.jpeg" alt=""></div>
+<div style="flex:1;"><img src="/assets/img/posts/sql-select-basics/07.jpeg" alt=""></div>
 </div>
 
 **조인(JOIN)** — 두 개 이상의 테이블을 양옆으로 연결해, 마치 하나의 테이블인 것처럼 데이터를 조회하는 방식. 셋 중 가장 까다롭다.
@@ -262,8 +262,8 @@ SELECT 문에서는 산술연산(`+ - * /`)을 할 수 있다. 컬럼과 상수,
 - **문자** : 연산 불가(에러)
 
 <div style="display:flex; gap:8px;">
-<div style="flex:1;"><img src="/assets/img/posts/sql-select-basics/12.png"></div>
-<div style="flex:1;"><img src="/assets/img/posts/sql-select-basics/13.png"></div>
+<div style="flex:1;"><img src="/assets/img/posts/sql-select-basics/12.png" alt=""></div>
+<div style="flex:1;"><img src="/assets/img/posts/sql-select-basics/13.png" alt=""></div>
 </div>
 
 연산 우선순위는 **괄호 > 곱셈·나눗셈 > 덧셈·뺄셈**이다. 같은 값이라도 괄호 위치에 따라 의미가 달라진다.

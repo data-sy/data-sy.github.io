@@ -537,8 +537,8 @@ CHAR의 성능이 좋은 이유는 데이터 딕셔너리와 관련이 있다. V
 DML이 왜 묶음 단위로 처리되는지는 디스크의 동작을 보면 이해된다. 디스크(저장 공간)는 **블록**으로 구성되며, 처음에는 비어 있다. 디스크는 데이터를 순차적으로 채워 저장하고, 검색도 일반적으로 순차 검색을 한다. 예를 들어 30을 찾으려면 블록 3개(10 → 20 → 30)를 읽어야 한다.
 
 <div style="display:flex; gap:8px;">
-<div style="flex:1;"><img src="/assets/img/posts/sql-dml-insert-update-delete/15.png"></div>
-<div style="flex:1;"><img src="/assets/img/posts/sql-dml-insert-update-delete/16.png"></div>
+<div style="flex:1;"><img src="/assets/img/posts/sql-dml-insert-update-delete/15.png" alt=""></div>
+<div style="flex:1;"><img src="/assets/img/posts/sql-dml-insert-update-delete/16.png" alt=""></div>
 </div>
 
 흥미로운 점은, 시스템 수준에는 **업데이트 기능이 없다**는 것이다. 변경은 곧 **삭제와 삽입**으로 이루어진다. 20을 50으로 바꾸는 것은 20을 삭제하고 50을 맨 뒤에 추가하는 것이고, 20이 있던 자리는 비어 **디스크 조각**이 된다. 사용하다 보면 이런 조각이 쌓여 읽어야 할 블록 수가 늘어나는데, 이를 회수해 빈 공간을 합치는 것이 **디스크 조각 모음**이다(윈도우가 느려질 때 조각 모음을 하는 이유다).

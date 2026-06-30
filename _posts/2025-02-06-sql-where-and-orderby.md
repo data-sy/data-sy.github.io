@@ -164,8 +164,8 @@ WHERE hire_date BETWEEN '2020/01/01' AND '2020/05/01'
 `IN`은 `=`의 확장판이다. `=`가 값 하나만 비교하는 단일 연산자라면, `IN`은 **여러 값을 동시에** 비교하는 복수 연산자다.
 
 <div style="display:flex; gap:8px;">
-<div style="flex:1;"><img src="/assets/img/posts/sql-where-and-orderby/04.jpeg"></div>
-<div style="flex:1;"><img src="/assets/img/posts/sql-where-and-orderby/05.jpeg"></div>
+<div style="flex:1;"><img src="/assets/img/posts/sql-where-and-orderby/04.jpeg" alt=""></div>
+<div style="flex:1;"><img src="/assets/img/posts/sql-where-and-orderby/05.jpeg" alt=""></div>
 </div>
 
 `OR`를 여러 번 반복하는 것보다 `IN` 하나를 쓰는 편이 좋다.

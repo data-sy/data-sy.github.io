@@ -544,8 +544,8 @@ SELECT * FROM a;
 주어진 **테이블 정의서**와 **데이터**는 다음과 같다.
 
 <div style="display:flex; gap:8px;">
-<div style="flex:1;"><img src="/assets/img/posts/sql-ddl-create-alter-drop/03.png"></div>
-<div style="flex:1;"><img src="/assets/img/posts/sql-ddl-create-alter-drop/04.png"></div>
+<div style="flex:1;"><img src="/assets/img/posts/sql-ddl-create-alter-drop/03.png" alt=""></div>
+<div style="flex:1;"><img src="/assets/img/posts/sql-ddl-create-alter-drop/04.png" alt=""></div>
 </div>
 
 #### 제약조건을 포함한 두 테이블 만들기
