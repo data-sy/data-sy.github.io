@@ -30,3 +30,6 @@ assets/js/dist
 *~
 .DS_Store
 Thumbs.db
+
+# 내부 기획 문서 — 비공개(로컬 정본)
+ROADMAP.md
